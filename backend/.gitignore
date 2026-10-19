@@ -1,0 +1,4 @@
+.env
+osrm-data/
+/server
+*.exe
