@@ -1,0 +1,27 @@
+# Зависимости и сборка фронтенда (восстанавливаются через npm install / npm run build)
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Секреты: в репозиторий попадает только образец .env.example
+.env
+.env.*
+!.env.example
+
+# Исходный фотоархив (12 ГБ) — хранится отдельно, не в git
+Архив фото/
+
+# Настройки редактора и мусор ОС
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Временные файлы Office (появляются, пока документ открыт)
+~$*
+
+# Логи
+*.log
+npm-debug.log*
