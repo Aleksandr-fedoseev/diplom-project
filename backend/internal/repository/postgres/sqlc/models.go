@@ -8,6 +8,41 @@ import (
 	"time"
 )
 
+type Order struct {
+	ID              int64
+	UserID          *int64
+	TotalKopecks    int64
+	Status          string
+	PaymentID       *string
+	PaymentUrl      string
+	DeliveryAddress string
+	Phone           string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type OrderItem struct {
+	OrderID      int64
+	ProductID    int64
+	Title        string
+	Quantity     int32
+	PriceKopecks int64
+}
+
+type Product struct {
+	ID           int64
+	Slug         string
+	Title        string
+	Description  string
+	Category     string
+	PriceKopecks int64
+	Stock        int32
+	ImageUrl     string
+	IsActive     bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
 type User struct {
 	ID           int64
 	Email        string
