@@ -27,9 +27,9 @@ func (q *Queries) AttachSubmissionMedia(ctx context.Context, arg AttachSubmissio
 const createMediaFile = `-- name: CreateMediaFile :one
 INSERT INTO media_files
     (object_id, submission_id, kind, storage_key, original_name, content_type, size_bytes,
-     caption, year_taken, source, uploaded_by)
+     caption, year_taken, source_note, uploaded_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source
+RETURNING id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source_note, projection, h_angle, source, author, license
 `
 
 type CreateMediaFileParams struct {
@@ -42,7 +42,7 @@ type CreateMediaFileParams struct {
 	SizeBytes    int64
 	Caption      string
 	YearTaken    string
-	Source       string
+	SourceNote   string
 	UploadedBy   *int64
 }
 
@@ -57,7 +57,7 @@ func (q *Queries) CreateMediaFile(ctx context.Context, arg CreateMediaFileParams
 		arg.SizeBytes,
 		arg.Caption,
 		arg.YearTaken,
-		arg.Source,
+		arg.SourceNote,
 		arg.UploadedBy,
 	)
 	var i MediaFile
@@ -74,7 +74,12 @@ func (q *Queries) CreateMediaFile(ctx context.Context, arg CreateMediaFileParams
 		&i.CreatedAt,
 		&i.SubmissionID,
 		&i.YearTaken,
+		&i.SourceNote,
+		&i.Projection,
+		&i.HAngle,
 		&i.Source,
+		&i.Author,
+		&i.License,
 	)
 	return i, err
 }
@@ -89,7 +94,7 @@ func (q *Queries) DeleteMediaFile(ctx context.Context, id int64) error {
 }
 
 const getMediaFile = `-- name: GetMediaFile :one
-SELECT id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source FROM media_files WHERE id = $1
+SELECT id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source_note, projection, h_angle, source, author, license FROM media_files WHERE id = $1
 `
 
 func (q *Queries) GetMediaFile(ctx context.Context, id int64) (MediaFile, error) {
@@ -108,13 +113,18 @@ func (q *Queries) GetMediaFile(ctx context.Context, id int64) (MediaFile, error)
 		&i.CreatedAt,
 		&i.SubmissionID,
 		&i.YearTaken,
+		&i.SourceNote,
+		&i.Projection,
+		&i.HAngle,
 		&i.Source,
+		&i.Author,
+		&i.License,
 	)
 	return i, err
 }
 
 const listMediaFilesByObject = `-- name: ListMediaFilesByObject :many
-SELECT id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source FROM media_files WHERE object_id = $1 ORDER BY kind, id
+SELECT id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source_note, projection, h_angle, source, author, license FROM media_files WHERE object_id = $1 ORDER BY kind, id
 `
 
 func (q *Queries) ListMediaFilesByObject(ctx context.Context, objectID *int64) ([]MediaFile, error) {
@@ -139,7 +149,12 @@ func (q *Queries) ListMediaFilesByObject(ctx context.Context, objectID *int64) (
 			&i.CreatedAt,
 			&i.SubmissionID,
 			&i.YearTaken,
+			&i.SourceNote,
+			&i.Projection,
+			&i.HAngle,
 			&i.Source,
+			&i.Author,
+			&i.License,
 		); err != nil {
 			return nil, err
 		}
@@ -152,7 +167,7 @@ func (q *Queries) ListMediaFilesByObject(ctx context.Context, objectID *int64) (
 }
 
 const listMediaFilesBySubmission = `-- name: ListMediaFilesBySubmission :many
-SELECT id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source FROM media_files WHERE submission_id = $1 ORDER BY id
+SELECT id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source_note, projection, h_angle, source, author, license FROM media_files WHERE submission_id = $1 ORDER BY id
 `
 
 func (q *Queries) ListMediaFilesBySubmission(ctx context.Context, submissionID *int64) ([]MediaFile, error) {
@@ -177,7 +192,12 @@ func (q *Queries) ListMediaFilesBySubmission(ctx context.Context, submissionID *
 			&i.CreatedAt,
 			&i.SubmissionID,
 			&i.YearTaken,
+			&i.SourceNote,
+			&i.Projection,
+			&i.HAngle,
 			&i.Source,
+			&i.Author,
+			&i.License,
 		); err != nil {
 			return nil, err
 		}

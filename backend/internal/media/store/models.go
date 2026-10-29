@@ -21,5 +21,10 @@ type MediaFile struct {
 	CreatedAt    time.Time
 	SubmissionID *int64
 	YearTaken    string
+	SourceNote   string
+	Projection   *string
+	HAngle       *int32
 	Source       string
+	Author       string
+	License      string
 }

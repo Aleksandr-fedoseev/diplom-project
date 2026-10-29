@@ -8,6 +8,33 @@ import (
 	"time"
 )
 
+type Category struct {
+	ID   int32
+	Slug string
+	Name string
+}
+
+type MediaFile struct {
+	ID           int64
+	ObjectID     *int64
+	Kind         string
+	StorageKey   string
+	OriginalName string
+	ContentType  string
+	SizeBytes    int64
+	Caption      string
+	UploadedBy   *int64
+	CreatedAt    time.Time
+	SubmissionID *int64
+	YearTaken    string
+	SourceNote   string
+	Projection   *string
+	HAngle       *int32
+	Source       string
+	Author       string
+	License      string
+}
+
 type Order struct {
 	ID              int64
 	UserID          *int64
