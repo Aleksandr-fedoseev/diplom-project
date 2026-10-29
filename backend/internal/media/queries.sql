@@ -1,7 +1,7 @@
 -- name: CreateMediaFile :one
 INSERT INTO media_files
     (object_id, submission_id, kind, storage_key, original_name, content_type, size_bytes,
-     caption, year_taken, source, uploaded_by)
+     caption, year_taken, source_note, uploaded_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING *;
 

@@ -178,7 +178,7 @@ func (s *Service) Upload(ctx context.Context, in UploadInput) (File, error) {
 		SizeBytes:    in.Size,
 		Caption:      in.Caption,
 		YearTaken:    in.YearTaken,
-		Source:       in.Source,
+		SourceNote:   in.Source, // после миграции 00004 свободный текст хранится в source_note
 		UploadedBy:   &in.UploadedBy,
 	})
 	if err != nil {
@@ -273,7 +273,7 @@ func toFile(r store.MediaFile) File {
 		SizeBytes:    r.SizeBytes,
 		Caption:      r.Caption,
 		YearTaken:    r.YearTaken,
-		Source:       r.Source,
+		Source:       r.SourceNote,
 		URL:          fileURL(r.ID),
 		CreatedAt:    r.CreatedAt,
 		storageKey:   r.StorageKey,
