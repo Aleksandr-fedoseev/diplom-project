@@ -4,15 +4,19 @@ import (
 	"context"
 	"net/http"
 
-	"heritage-backend/internal/auth"
+	legacyauth "heritage-backend/internal/auth"
 	"heritage-backend/internal/catalog"
+	"heritage-backend/internal/infrastructure/security"
 	"heritage-backend/internal/media"
 	"heritage-backend/internal/notifications"
 	"heritage-backend/internal/osrm"
+	repo "heritage-backend/internal/repository/postgres"
 	"heritage-backend/internal/routes"
-	"heritage-backend/internal/server"
+	authsvc "heritage-backend/internal/service/auth"
 	"heritage-backend/internal/shop"
 	"heritage-backend/internal/submissions"
+	httptransport "heritage-backend/internal/transport/http"
+	authhttp "heritage-backend/internal/transport/http/auth"
 )
 
 // wire создаёт модули и связывает их между собой. Возвращает корневой HTTP-обработчик;
@@ -20,11 +24,14 @@ import (
 func (a *App) wire(ctx context.Context) (http.Handler, error) {
 	cfg, db := a.cfg, a.pool
 
-	tokens := auth.NewTokenIssuer(cfg.JWTSecret, cfg.JWTTTL)
-	authSvc := auth.NewService(db, tokens)
-	if err := authSvc.EnsureAdmin(ctx, cfg.AdminEmail, cfg.AdminPassword); err != nil {
+	// Пользователи: репозиторий → сервис (bcrypt и JWT подставляются через порты) → обработчик.
+	authService := authsvc.NewService(repo.NewUsers(db), security.BcryptHasher{},
+		security.NewJWTIssuer(cfg.JWTSecret, cfg.JWTTTL))
+	if err := authService.EnsureAdmin(ctx, cfg.AdminEmail, cfg.AdminPassword); err != nil {
 		return nil, err
 	}
+	// Старый сервис пользователей нужен submissions и shop, пока они не переехали.
+	legacyAuth := legacyauth.NewService(db)
 
 	// Письма уходят через SMTP, а без него (при разработке) — только в лог.
 	var sender notifications.Sender = notifications.LogSender{}
@@ -44,17 +51,17 @@ func (a *App) wire(ctx context.Context) (http.Handler, error) {
 	}
 	mediaHandler := media.NewHandler(mediaSvc)
 
-	return server.New(server.Deps{
-		DB:          db,
-		Tokens:      tokens,
-		CORSOrigins: cfg.CORSOrigins,
-		Auth:        auth.NewHandler(authSvc),
-		Catalog:     catalog.NewHandler(catalogSvc, mediaSvc, mediaHandler),
-		Media:       mediaHandler,
-		Routes:      routes.NewHandler(routes.NewService(db, catalogSvc, osrm.NewClient(cfg.OSRMURL))),
-		Submissions: submissions.NewHandler(submissions.NewService(db, catalogSvc, mediaSvc, authSvc, notifySvc, cfg.PublicURL)),
+	return httptransport.New(httptransport.Deps{
+		CORSOrigins:   cfg.CORSOrigins,
+		Authenticator: authService,
+		Health:        db.Ping,
+		Auth:          authhttp.NewHandler(authService),
+		Catalog:       catalog.NewHandler(catalogSvc, mediaSvc, mediaHandler),
+		Media:         mediaHandler,
+		Routes:        routes.NewHandler(routes.NewService(db, catalogSvc, osrm.NewClient(cfg.OSRMURL))),
+		Submissions:   submissions.NewHandler(submissions.NewService(db, catalogSvc, mediaSvc, legacyAuth, notifySvc, cfg.PublicURL)),
 		// Без YOOKASSA_SHOP_ID клиент не обращается к ЮKassa: заказ создаётся без ссылки на оплату.
-		Shop: shop.NewHandler(shop.NewService(db, authSvc, notifySvc,
+		Shop: shop.NewHandler(shop.NewService(db, legacyAuth, notifySvc,
 			shop.NewYooKassaClient(cfg.YooKassaShopID, cfg.YooKassaSecretKey), cfg.YooKassaReturnURL)),
 	}), nil
 }

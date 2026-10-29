@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -97,7 +96,7 @@ type env struct {
 
 func newEnv(t *testing.T) *env {
 	db := testdb.Connect(t)
-	users := auth.NewService(db, auth.NewTokenIssuer("0123456789abcdef0123456789abcdef", time.Hour))
+	users := auth.NewService(db)
 	gw := newFakeGateway()
 	svc := NewService(db, users, notifications.NewService(db, nopSender{}), gw, "https://site.test/shop/orders")
 	return &env{t: t, ctx: context.Background(), svc: svc, users: users, gw: gw}

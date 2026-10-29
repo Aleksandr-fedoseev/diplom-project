@@ -42,9 +42,7 @@ func TestQueueRetriesAndSends(t *testing.T) {
 	}
 
 	// Первая попытка падает, письмо откладывается на минуту.
-	if err := svc.ProcessDue(ctx); err != nil {
-		t.Fatal(err)
-	}
+	drain(t, svc)
 	var status, lastError string
 	var attempts int
 	var next time.Time
@@ -61,9 +59,7 @@ func TestQueueRetriesAndSends(t *testing.T) {
 	if _, err := db.Exec(ctx, `UPDATE email_jobs SET next_attempt_at = now() WHERE to_email = $1`, to); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.ProcessDue(ctx); err != nil {
-		t.Fatal(err)
-	}
+	drain(t, svc)
 	var found bool
 	for _, m := range sender.sent {
 		found = found || (m.To == to && m.Subject == "Заявка одобрена")
@@ -89,5 +85,17 @@ func TestBuildMessageEncodesCyrillic(t *testing.T) {
 	msg := string(buildMessage("noreply@heritage.ru", Message{To: "a@b.ru", Subject: "Решение по заявке", Body: "Текст"}))
 	if !strings.Contains(msg, "Subject: =?utf-8?q?") || !strings.Contains(msg, "0KLQtdC60YHRgg==") {
 		t.Fatalf("письмо закодировано неверно:\n%s", msg)
+	}
+}
+
+// drain несколько раз обрабатывает очередь: в общей тестовой БД могут лежать письма
+// других тестов, и нужное письмо не обязательно попадёт в первую пачку. Обработанные
+// письма уходят в отложенные, поэтому каждый проход берёт следующие.
+func drain(t *testing.T, svc *Service) {
+	t.Helper()
+	for range 50 {
+		if err := svc.ProcessDue(context.Background()); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

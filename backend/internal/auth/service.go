@@ -1,4 +1,5 @@
-// Package auth — регистрация, вход, JWT и проверка ролей.
+// Package auth — старый сервис пользователей. Нужен только модулям submissions и shop,
+// пока они не переехали на новую раскладку; новые сценарии — в service/auth.
 package auth
 
 import (
@@ -50,12 +51,11 @@ func toUser(u store.User) User {
 }
 
 type Service struct {
-	q      *store.Queries // запросы из queries.sql, код сгенерирован sqlc
-	tokens *TokenIssuer
+	q *store.Queries // запросы из queries.sql, код сгенерирован sqlc
 }
 
-func NewService(db *pgxpool.Pool, tokens *TokenIssuer) *Service {
-	return &Service{q: store.New(db), tokens: tokens}
+func NewService(db *pgxpool.Pool) *Service {
+	return &Service{q: store.New(db)}
 }
 
 type RegisterInput struct {
@@ -103,32 +103,6 @@ func (s *Service) create(ctx context.Context, in RegisterInput, role string) (Us
 	return toUser(u), nil
 }
 
-// Login возвращает JWT. На неверный email и неверный пароль отвечаем одинаково,
-// чтобы по ответу нельзя было узнать, зарегистрирован ли email.
-func (s *Service) Login(ctx context.Context, email, password string) (string, User, error) {
-	u, err := s.q.GetUserByEmail(ctx, strings.ToLower(strings.TrimSpace(email)))
-
-	invalid := httpx.Unauthorized("неверный email или пароль")
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", User{}, invalid
-	}
-	if err != nil {
-		return "", User{}, fmt.Errorf("поиск пользователя: %w", err)
-	}
-	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
-		return "", User{}, invalid
-	}
-	if u.IsBlocked {
-		return "", User{}, httpx.Forbidden("пользователь заблокирован")
-	}
-
-	token, err := s.tokens.Issue(u.ID, u.Role)
-	if err != nil {
-		return "", User{}, fmt.Errorf("выпуск токена: %w", err)
-	}
-	return token, toUser(u), nil
-}
-
 func (s *Service) GetByID(ctx context.Context, id int64) (User, error) {
 	u, err := s.q.GetUserByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -138,20 +112,6 @@ func (s *Service) GetByID(ctx context.Context, id int64) (User, error) {
 		return User{}, fmt.Errorf("поиск пользователя: %w", err)
 	}
 	return toUser(u), nil
-}
-
-// EnsureAdmin создаёт первого администратора, если его ещё нет.
-// Без этого некому было бы назначать модераторов.
-func (s *Service) EnsureAdmin(ctx context.Context, email, password string) error {
-	if email == "" || password == "" {
-		return nil
-	}
-	_, err := s.create(ctx, RegisterInput{Email: strings.ToLower(email), Password: password, Name: "Администратор"}, RoleAdmin)
-	var he *httpx.Error
-	if errors.As(err, &he) && he.Status == 409 {
-		return nil // уже существует
-	}
-	return err
 }
 
 // EnsureActive возвращает 403, если пользователь заблокирован. Токен заблокированного
