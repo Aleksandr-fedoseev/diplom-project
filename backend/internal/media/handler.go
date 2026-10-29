@@ -48,6 +48,8 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) error {
 		ObjectID:     objectID,
 		Kind:         r.FormValue("kind"),
 		Caption:      r.FormValue("caption"),
+		YearTaken:    r.FormValue("yearTaken"),
+		Source:       r.FormValue("source"),
 		OriginalName: header.Filename,
 		Size:         header.Size,
 		Body:         file,
@@ -65,14 +67,21 @@ func (h *Handler) download(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return httpx.BadRequest("некорректный id")
 	}
-	f, obj, err := h.svc.Open(r.Context(), id)
+	f, obj, err := h.svc.Open(r.Context(), id, func(f File) bool {
+		p, ok := auth.FromContext(r.Context())
+		return ok && f.CanView(p.UserID, auth.AtLeast(p.Role, auth.RoleModerator))
+	})
 	if err != nil {
 		return err
 	}
 	defer obj.Close()
 
 	w.Header().Set("Content-Type", f.ContentType)
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	if f.IsPublic() {
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+	} else {
+		w.Header().Set("Cache-Control", "private, no-store") // файл заявки не кэшируют прокси
+	}
 	http.ServeContent(w, r, f.OriginalName, f.CreatedAt, obj)
 	return nil
 }

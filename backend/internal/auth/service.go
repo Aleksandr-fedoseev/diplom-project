@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
+	"heritage-backend/internal/auth/store"
 	"heritage-backend/internal/httpx"
 )
 
@@ -36,13 +37,25 @@ type User struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
+// toUser переводит строку таблицы в ответ API. Хэш пароля наружу не отдаётся.
+func toUser(u store.User) User {
+	return User{
+		ID:        u.ID,
+		Email:     u.Email,
+		Name:      u.Name,
+		Role:      u.Role,
+		IsBlocked: u.IsBlocked,
+		CreatedAt: u.CreatedAt,
+	}
+}
+
 type Service struct {
-	db     *pgxpool.Pool
+	q      *store.Queries // запросы из queries.sql, код сгенерирован sqlc
 	tokens *TokenIssuer
 }
 
 func NewService(db *pgxpool.Pool, tokens *TokenIssuer) *Service {
-	return &Service{db: db, tokens: tokens}
+	return &Service{q: store.New(db), tokens: tokens}
 }
 
 type RegisterInput struct {
@@ -73,13 +86,12 @@ func (s *Service) create(ctx context.Context, in RegisterInput, role string) (Us
 		return User{}, fmt.Errorf("хэширование пароля: %w", err)
 	}
 
-	var u User
-	err = s.db.QueryRow(ctx, `
-		INSERT INTO users (email, password_hash, name, role)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, email, name, role, is_blocked, created_at`,
-		in.Email, string(hash), in.Name, role,
-	).Scan(&u.ID, &u.Email, &u.Name, &u.Role, &u.IsBlocked, &u.CreatedAt)
+	u, err := s.q.CreateUser(ctx, store.CreateUserParams{
+		Email:        in.Email,
+		PasswordHash: string(hash),
+		Name:         in.Name,
+		Role:         role,
+	})
 
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
@@ -88,21 +100,13 @@ func (s *Service) create(ctx context.Context, in RegisterInput, role string) (Us
 	if err != nil {
 		return User{}, fmt.Errorf("создание пользователя: %w", err)
 	}
-	return u, nil
+	return toUser(u), nil
 }
 
 // Login возвращает JWT. На неверный email и неверный пароль отвечаем одинаково,
 // чтобы по ответу нельзя было узнать, зарегистрирован ли email.
 func (s *Service) Login(ctx context.Context, email, password string) (string, User, error) {
-	var (
-		u    User
-		hash string
-	)
-	err := s.db.QueryRow(ctx, `
-		SELECT id, email, name, role, is_blocked, created_at, password_hash
-		FROM users WHERE email = $1`,
-		strings.ToLower(strings.TrimSpace(email)),
-	).Scan(&u.ID, &u.Email, &u.Name, &u.Role, &u.IsBlocked, &u.CreatedAt, &hash)
+	u, err := s.q.GetUserByEmail(ctx, strings.ToLower(strings.TrimSpace(email)))
 
 	invalid := httpx.Unauthorized("неверный email или пароль")
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -111,7 +115,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (string, Us
 	if err != nil {
 		return "", User{}, fmt.Errorf("поиск пользователя: %w", err)
 	}
-	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
 		return "", User{}, invalid
 	}
 	if u.IsBlocked {
@@ -122,18 +126,18 @@ func (s *Service) Login(ctx context.Context, email, password string) (string, Us
 	if err != nil {
 		return "", User{}, fmt.Errorf("выпуск токена: %w", err)
 	}
-	return token, u, nil
+	return token, toUser(u), nil
 }
 
 func (s *Service) GetByID(ctx context.Context, id int64) (User, error) {
-	var u User
-	err := s.db.QueryRow(ctx, `
-		SELECT id, email, name, role, is_blocked, created_at FROM users WHERE id = $1`, id,
-	).Scan(&u.ID, &u.Email, &u.Name, &u.Role, &u.IsBlocked, &u.CreatedAt)
+	u, err := s.q.GetUserByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, httpx.NotFound("пользователь не найден")
 	}
-	return u, err
+	if err != nil {
+		return User{}, fmt.Errorf("поиск пользователя: %w", err)
+	}
+	return toUser(u), nil
 }
 
 // EnsureAdmin создаёт первого администратора, если его ещё нет.
@@ -148,4 +152,84 @@ func (s *Service) EnsureAdmin(ctx context.Context, email, password string) error
 		return nil // уже существует
 	}
 	return err
+}
+
+// EnsureActive возвращает 403, если пользователь заблокирован. Токен заблокированного
+// действует до истечения срока, поэтому модули проверяют блокировку перед записью
+// (подача заявки, оформление заказа).
+func (s *Service) EnsureActive(ctx context.Context, userID int64) error {
+	u, err := s.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if u.IsBlocked {
+		return httpx.Forbidden("пользователь заблокирован")
+	}
+	return nil
+}
+
+// Управление пользователями (администратор и модератор).
+
+func (s *Service) List(ctx context.Context, limit, offset int32) ([]User, error) {
+	rows, err := s.q.ListUsers(ctx, store.ListUsersParams{Limit: limit, Offset: offset})
+	if err != nil {
+		return nil, err
+	}
+	users := make([]User, len(rows))
+	for i, u := range rows {
+		users[i] = toUser(u)
+	}
+	return users, nil
+}
+
+// SetRole назначает роль. Себе роль менять нельзя: иначе единственный администратор
+// мог бы случайно лишить себя прав и некому было бы их вернуть.
+func (s *Service) SetRole(ctx context.Context, actorID, userID int64, role string) (User, error) {
+	if _, ok := roleLevel[role]; !ok {
+		return User{}, httpx.BadRequest("role: user, moderator или admin")
+	}
+	if actorID == userID {
+		return User{}, httpx.BadRequest("нельзя менять роль самому себе")
+	}
+	u, err := s.q.SetUserRole(ctx, store.SetUserRoleParams{ID: userID, Role: role})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, httpx.NotFound("пользователь не найден")
+	}
+	if err != nil {
+		return User{}, err
+	}
+	return toUser(u), nil
+}
+
+// SetBlocked блокирует или разблокирует пользователя. Модератор может блокировать
+// только обычных пользователей, администратор — всех, кроме себя.
+func (s *Service) SetBlocked(ctx context.Context, actorID int64, actorRole string, userID int64, blocked bool) (User, error) {
+	return setBlocked(ctx, s.q, actorID, actorRole, userID, blocked)
+}
+
+// SetBlockedTx — то же в транзакции вызывающего модуля
+// (отказ по заявке и блокировка её автора сохраняются вместе).
+func (s *Service) SetBlockedTx(ctx context.Context, tx pgx.Tx, actorID int64, actorRole string, userID int64, blocked bool) (User, error) {
+	return setBlocked(ctx, s.q.WithTx(tx), actorID, actorRole, userID, blocked)
+}
+
+func setBlocked(ctx context.Context, q *store.Queries, actorID int64, actorRole string, userID int64, blocked bool) (User, error) {
+	if actorID == userID {
+		return User{}, httpx.BadRequest("нельзя заблокировать самого себя")
+	}
+	target, err := q.GetUserByID(ctx, userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, httpx.NotFound("пользователь не найден")
+	}
+	if err != nil {
+		return User{}, err
+	}
+	if actorRole != RoleAdmin && target.Role != RoleUser {
+		return User{}, httpx.Forbidden("модератор может блокировать только пользователей")
+	}
+	u, err := q.SetUserBlocked(ctx, store.SetUserBlockedParams{ID: userID, IsBlocked: blocked})
+	if err != nil {
+		return User{}, err
+	}
+	return toUser(u), nil
 }

@@ -13,15 +13,15 @@ import (
 )
 
 type Handler struct {
-	repo  *Repository
+	svc   *Service
 	media *media.Service
 	// upload — обработчик загрузки из пакета media; подключается сюда,
 	// чтобы адрес был «вложенным»: POST /api/objects/{id}/media.
 	upload http.Handler
 }
 
-func NewHandler(repo *Repository, mediaSvc *media.Service, mediaHandler *media.Handler) *Handler {
-	return &Handler{repo: repo, media: mediaSvc, upload: httpx.Handler(mediaHandler.Upload)}
+func NewHandler(svc *Service, mediaSvc *media.Service, mediaHandler *media.Handler) *Handler {
+	return &Handler{svc: svc, media: mediaSvc, upload: httpx.Handler(mediaHandler.Upload)}
 }
 
 // Routes подключается по адресу /api.
@@ -36,11 +36,17 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Method(http.MethodPut, "/objects/{id}", httpx.Handler(h.update))
 		r.Method(http.MethodPost, "/objects/{id}/media", h.upload)
 	})
-	r.With(auth.RequireRole(auth.RoleAdmin)).Method(http.MethodDelete, "/objects/{id}", httpx.Handler(h.delete))
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RequireRole(auth.RoleAdmin))
+		r.Method(http.MethodDelete, "/objects/{id}", httpx.Handler(h.delete))
+		r.Method(http.MethodPost, "/categories", httpx.Handler(h.createCategory))
+		r.Method(http.MethodPut, "/categories/{id}", httpx.Handler(h.updateCategory))
+		r.Method(http.MethodDelete, "/categories/{id}", httpx.Handler(h.deleteCategory))
+	})
 }
 
 func (h *Handler) listCategories(w http.ResponseWriter, r *http.Request) error {
-	cats, err := h.repo.ListCategories(r.Context())
+	cats, err := h.svc.ListCategories(r.Context())
 	if err != nil {
 		return err
 	}
@@ -98,7 +104,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 		f.BBox = &b
 	}
 
-	objects, err := h.repo.List(r.Context(), f)
+	objects, err := h.svc.List(r.Context(), f)
 	if err != nil {
 		return err
 	}
@@ -107,7 +113,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) error {
-	o, err := h.repo.GetBySlug(r.Context(), chi.URLParam(r, "id"))
+	o, err := h.svc.GetBySlug(r.Context(), chi.URLParam(r, "id"))
 	if err != nil {
 		return err
 	}
@@ -132,7 +138,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) error {
 	if err := httpx.DecodeJSON(r, &in); err != nil {
 		return err
 	}
-	o, err := h.repo.Create(r.Context(), in)
+	o, err := h.svc.Create(r.Context(), in)
 	if err != nil {
 		return err
 	}
@@ -149,7 +155,7 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) error {
 	if err := httpx.DecodeJSON(r, &in); err != nil {
 		return err
 	}
-	o, err := h.repo.Update(r.Context(), id, in)
+	o, err := h.svc.Update(r.Context(), id, in)
 	if err != nil {
 		return err
 	}
@@ -162,7 +168,49 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return httpx.BadRequest("некорректный id")
 	}
-	if err := h.repo.Delete(r.Context(), id); err != nil {
+	if err := h.svc.Delete(r.Context(), id); err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+func (h *Handler) createCategory(w http.ResponseWriter, r *http.Request) error {
+	var in CategoryInput
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return err
+	}
+	c, err := h.svc.CreateCategory(r.Context(), in)
+	if err != nil {
+		return err
+	}
+	httpx.JSON(w, http.StatusCreated, c)
+	return nil
+}
+
+func (h *Handler) updateCategory(w http.ResponseWriter, r *http.Request) error {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 32)
+	if err != nil {
+		return httpx.BadRequest("некорректный id")
+	}
+	var in CategoryInput
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return err
+	}
+	c, err := h.svc.UpdateCategory(r.Context(), int32(id), in)
+	if err != nil {
+		return err
+	}
+	httpx.JSON(w, http.StatusOK, c)
+	return nil
+}
+
+func (h *Handler) deleteCategory(w http.ResponseWriter, r *http.Request) error {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 32)
+	if err != nil {
+		return httpx.BadRequest("некорректный id")
+	}
+	if err := h.svc.DeleteCategory(r.Context(), int32(id)); err != nil {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)

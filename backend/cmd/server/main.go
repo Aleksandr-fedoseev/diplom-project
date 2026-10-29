@@ -16,9 +16,12 @@ import (
 	"heritage-backend/internal/config"
 	"heritage-backend/internal/database"
 	"heritage-backend/internal/media"
+	"heritage-backend/internal/notifications"
 	"heritage-backend/internal/osrm"
 	"heritage-backend/internal/routes"
 	"heritage-backend/internal/server"
+	"heritage-backend/internal/shop"
+	"heritage-backend/internal/submissions"
 )
 
 func main() {
@@ -55,7 +58,24 @@ func run() error {
 		return err
 	}
 
-	mediaSvc, err := media.NewService(ctx, db, cfg.MinIOEndpoint, cfg.MinIOAccessKey, cfg.MinIOSecretKey,
+	// Письма уходят через SMTP, а без него (при разработке) — только в лог.
+	var sender notifications.Sender = notifications.LogSender{}
+	if cfg.SMTPHost != "" {
+		sender = notifications.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
+	}
+	notifySvc := notifications.NewService(db, sender)
+	// Фоновый обработчик очереди писем; останавливается вместе с сервером по ctx.
+	workerDone := make(chan struct{})
+	go func() {
+		defer close(workerDone)
+		notifySvc.Run(ctx)
+	}()
+	defer func() { stop(); <-workerDone }() // дожидаемся, пока обработчик допишет текущее письмо
+
+	// Каталог — владелец объектов; медиафайлы и маршруты получают сведения об объектах через него.
+	catalogSvc := catalog.NewService(db)
+
+	mediaSvc, err := media.NewService(ctx, db, catalogSvc, cfg.MinIOEndpoint, cfg.MinIOAccessKey, cfg.MinIOSecretKey,
 		cfg.MinIOBucket, cfg.MinIOUseSSL, cfg.MaxUploadMB)
 	if err != nil {
 		return err
@@ -67,9 +87,13 @@ func run() error {
 		Tokens:      tokens,
 		CORSOrigins: cfg.CORSOrigins,
 		Auth:        auth.NewHandler(authSvc),
-		Catalog:     catalog.NewHandler(catalog.NewRepository(db), mediaSvc, mediaHandler),
+		Catalog:     catalog.NewHandler(catalogSvc, mediaSvc, mediaHandler),
 		Media:       mediaHandler,
-		Routes:      routes.NewHandler(routes.NewService(db, osrm.NewClient(cfg.OSRMURL))),
+		Routes:      routes.NewHandler(routes.NewService(db, catalogSvc, osrm.NewClient(cfg.OSRMURL))),
+		Submissions: submissions.NewHandler(submissions.NewService(db, catalogSvc, mediaSvc, authSvc, notifySvc, cfg.PublicURL)),
+		// Без YOOKASSA_SHOP_ID клиент не обращается к ЮKassa: заказ создаётся без ссылки на оплату.
+		Shop: shop.NewHandler(shop.NewService(db, authSvc, notifySvc,
+			shop.NewYooKassaClient(cfg.YooKassaShopID, cfg.YooKassaSecretKey), cfg.YooKassaReturnURL)),
 	})
 
 	srv := &http.Server{
