@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"heritage-backend/internal/auth"
 	"heritage-backend/internal/catalog"
@@ -74,7 +73,7 @@ func TestSaveGetListDelete(t *testing.T) {
 	}
 
 	// Пользовательский маршрут: владелец видит его в своём списке и может удалить, чужой — нет.
-	users := auth.NewService(db, auth.NewTokenIssuer("0123456789abcdef0123456789abcdef", time.Hour))
+	users := auth.NewService(db)
 	owner, err := users.Register(ctx, auth.RegisterInput{Email: testdb.Unique("owner") + "@example.ru", Password: "password1", Name: "Владелец"})
 	if err != nil {
 		t.Fatal(err)

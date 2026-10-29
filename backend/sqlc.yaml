@@ -66,3 +66,14 @@ sql:
       go:
         <<: *go
         out: internal/shop/store
+
+  # Новая раскладка: все репозитории в repository/postgres, один пакет sqlc,
+  # запросы разложены по файлам модулей в queries/.
+  - engine: postgresql
+    schema: migrations
+    queries: internal/repository/postgres/queries
+    gen:
+      go:
+        <<: *go
+        package: sqlc
+        out: internal/repository/postgres/sqlc

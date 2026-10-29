@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -90,7 +89,7 @@ func setup(t *testing.T) env {
 	t.Helper()
 	db := testdb.Connect(t)
 	cat := catalog.NewService(db)
-	users := auth.NewService(db, auth.NewTokenIssuer("0123456789abcdef0123456789abcdef", time.Hour))
+	users := auth.NewService(db)
 	fm := newFakeMedia()
 	svc := NewService(db, cat, fm, users, notifications.NewService(db, notifications.LogSender{}), "https://heritage.test/")
 
