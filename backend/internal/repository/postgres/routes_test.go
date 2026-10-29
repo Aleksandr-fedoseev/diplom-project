@@ -25,7 +25,7 @@ func TestRoutesRepository(t *testing.T) {
 	var objectIDs []int64
 	for _, slug := range []string{"dom-agamzhanovoy", "birzha", "azovo-donskoy-bank"} {
 		var id int64
-		if err := pool.QueryRow(ctx, "SELECT id FROM heritage_objects WHERE slug = $1", slug).Scan(&id); err != nil {
+		if err := pool.QueryRow(ctx, "SELECT id FROM catalog.heritage_objects WHERE slug = $1", slug).Scan(&id); err != nil {
 			t.Fatalf("объект %s: %v", slug, err)
 		}
 		objectIDs = append(objectIDs, id)

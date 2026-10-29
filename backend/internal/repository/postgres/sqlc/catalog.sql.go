@@ -11,7 +11,7 @@ import (
 )
 
 const createCategory = `-- name: CreateCategory :one
-INSERT INTO categories (slug, name) VALUES ($1, $2) RETURNING id, slug, name
+INSERT INTO catalog.categories (slug, name) VALUES ($1, $2) RETURNING id, slug, name
 `
 
 type CreateCategoryParams struct {
@@ -27,11 +27,11 @@ func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) 
 }
 
 const createObject = `-- name: CreateObject :exec
-INSERT INTO heritage_objects
+INSERT INTO catalog.heritage_objects
     (slug, title, category_id, protection_status, registry_number, year_built, architect,
      architectural_style, address, location, short_description, full_history, tags, is_published)
 VALUES (
-    $1, $2, (SELECT cat.id FROM categories cat WHERE cat.slug = $3),
+    $1, $2, (SELECT cat.id FROM catalog.categories cat WHERE cat.slug = $3),
     $4, $5, $6, $7,
     $8, $9,
     ST_SetSRID(ST_MakePoint($10::float8, $11::float8), 4326)::geography,
@@ -79,7 +79,7 @@ func (q *Queries) CreateObject(ctx context.Context, arg CreateObjectParams) erro
 }
 
 const deleteCategory = `-- name: DeleteCategory :execrows
-DELETE FROM categories WHERE id = $1
+DELETE FROM catalog.categories WHERE id = $1
 `
 
 func (q *Queries) DeleteCategory(ctx context.Context, id int32) (int64, error) {
@@ -91,7 +91,7 @@ func (q *Queries) DeleteCategory(ctx context.Context, id int32) (int64, error) {
 }
 
 const deleteObject = `-- name: DeleteObject :execrows
-DELETE FROM heritage_objects WHERE id = $1
+DELETE FROM catalog.heritage_objects WHERE id = $1
 `
 
 func (q *Queries) DeleteObject(ctx context.Context, id int64) (int64, error) {
@@ -109,8 +109,8 @@ SELECT
     ST_Y(o.location::geometry)::float8 AS lat,
     ST_X(o.location::geometry)::float8 AS lng,
     o.short_description, o.full_history, o.tags, o.is_published, o.updated_at
-FROM heritage_objects o
-JOIN categories c ON c.id = o.category_id
+FROM catalog.heritage_objects o
+JOIN catalog.categories c ON c.id = o.category_id
 WHERE o.slug = $1
 `
 
@@ -161,7 +161,7 @@ func (q *Queries) GetObjectBySlug(ctx context.Context, slug string) (GetObjectBy
 
 const listCategories = `-- name: ListCategories :many
 
-SELECT id, slug, name FROM categories ORDER BY id
+SELECT id, slug, name FROM catalog.categories ORDER BY id
 `
 
 // Запросы модуля каталога: категории и объекты наследия (PostGIS для поиска на карте).
@@ -192,8 +192,8 @@ SELECT
     ST_Y(o.location::geometry)::float8 AS lat,
     ST_X(o.location::geometry)::float8 AS lng,
     o.short_description, o.tags, o.is_published, o.updated_at
-FROM heritage_objects o
-JOIN categories c ON c.id = o.category_id
+FROM catalog.heritage_objects o
+JOIN catalog.categories c ON c.id = o.category_id
 WHERE ($1::bool OR o.is_published)
   AND ($2::text IS NULL OR c.slug = $2::text)
   AND ($3::text IS NULL OR o.protection_status = $3::text)
@@ -294,8 +294,8 @@ SELECT
     ST_X(o.location::geometry)::float8 AS lng,
     o.short_description, o.tags, o.is_published, o.updated_at,
     ST_Distance(o.location, ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography)::float8 AS distance_m
-FROM heritage_objects o
-JOIN categories c ON c.id = o.category_id
+FROM catalog.heritage_objects o
+JOIN catalog.categories c ON c.id = o.category_id
 WHERE ($3::bool OR o.is_published)
   AND ($4::text IS NULL OR c.slug = $4::text)
   AND ($5::text IS NULL OR o.protection_status = $5::text)
@@ -402,7 +402,7 @@ const listPlacesByIDs = `-- name: ListPlacesByIDs :many
 SELECT id, slug, title,
        ST_Y(location::geometry)::float8 AS lat,
        ST_X(location::geometry)::float8 AS lng
-FROM heritage_objects
+FROM catalog.heritage_objects
 WHERE id = ANY($1::bigint[])
 `
 
@@ -444,7 +444,7 @@ const listPublishedPlacesBySlugs = `-- name: ListPublishedPlacesBySlugs :many
 SELECT id, slug, title,
        ST_Y(location::geometry)::float8 AS lat,
        ST_X(location::geometry)::float8 AS lng
-FROM heritage_objects
+FROM catalog.heritage_objects
 WHERE slug = ANY($1::text[]) AND is_published
 `
 
@@ -484,7 +484,7 @@ func (q *Queries) ListPublishedPlacesBySlugs(ctx context.Context, slugs []string
 
 const objectExists = `-- name: ObjectExists :one
 
-SELECT EXISTS (SELECT 1 FROM heritage_objects WHERE id = $1)
+SELECT EXISTS (SELECT 1 FROM catalog.heritage_objects WHERE id = $1)
 `
 
 // Запросы для других модулей (маршруты, медиафайлы): они не читают таблицы каталога сами.
@@ -496,7 +496,7 @@ func (q *Queries) ObjectExists(ctx context.Context, id int64) (bool, error) {
 }
 
 const updateCategory = `-- name: UpdateCategory :one
-UPDATE categories SET slug = $2, name = $3 WHERE id = $1 RETURNING id, slug, name
+UPDATE catalog.categories SET slug = $2, name = $3 WHERE id = $1 RETURNING id, slug, name
 `
 
 type UpdateCategoryParams struct {
@@ -513,10 +513,10 @@ func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) 
 }
 
 const updateObject = `-- name: UpdateObject :execrows
-UPDATE heritage_objects SET
+UPDATE catalog.heritage_objects SET
     slug = $1,
     title = $2,
-    category_id = (SELECT cat.id FROM categories cat WHERE cat.slug = $3),
+    category_id = (SELECT cat.id FROM catalog.categories cat WHERE cat.slug = $3),
     protection_status = $4,
     registry_number = $5,
     year_built = $6,

@@ -4,7 +4,7 @@
 
 -- Точка собирается из долготы и широты; если координат нет, ST_MakePoint(NULL, NULL) даёт NULL.
 -- name: CreateSubmission :one
-INSERT INTO submissions (author_id, kind, object_id, title, description, address, location, period, source)
+INSERT INTO submission.submissions (author_id, kind, object_id, title, description, address, location, period, source)
 VALUES (
     sqlc.arg(author_id), sqlc.arg(kind), sqlc.narg(object_id), sqlc.arg(title), sqlc.arg(description),
     sqlc.arg(address),
@@ -23,8 +23,8 @@ SELECT
     COALESCE(ST_X(s.location::geometry), 0)::float8 AS lng,
     s.period, s.source, s.status, s.created_at,
     d.decision, d.reason, d.moderator_id, d.created_at AS decided_at
-FROM submissions s
-LEFT JOIN moderation_decisions d ON d.submission_id = s.id
+FROM submission.submissions s
+LEFT JOIN submission.moderation_decisions d ON d.submission_id = s.id
 WHERE s.id = $1;
 
 -- Свои заявки пользователя, новые первыми.
@@ -36,8 +36,8 @@ SELECT
     COALESCE(ST_X(s.location::geometry), 0)::float8 AS lng,
     s.period, s.source, s.status, s.created_at,
     d.decision, d.reason, d.moderator_id, d.created_at AS decided_at
-FROM submissions s
-LEFT JOIN moderation_decisions d ON d.submission_id = s.id
+FROM submission.submissions s
+LEFT JOIN submission.moderation_decisions d ON d.submission_id = s.id
 WHERE s.author_id = $1
 ORDER BY s.created_at DESC, s.id DESC;
 
@@ -51,8 +51,8 @@ SELECT
     COALESCE(ST_X(s.location::geometry), 0)::float8 AS lng,
     s.period, s.source, s.status, s.created_at,
     d.decision, d.reason, d.moderator_id, d.created_at AS decided_at
-FROM submissions s
-LEFT JOIN moderation_decisions d ON d.submission_id = s.id
+FROM submission.submissions s
+LEFT JOIN submission.moderation_decisions d ON d.submission_id = s.id
 WHERE s.status = $1
 ORDER BY s.created_at, s.id
 LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
@@ -67,16 +67,16 @@ SELECT
     COALESCE(ST_Y(location::geometry), 0)::float8 AS lat,
     COALESCE(ST_X(location::geometry), 0)::float8 AS lng,
     period, source, status, created_at
-FROM submissions
+FROM submission.submissions
 WHERE id = $1
 FOR UPDATE;
 
 -- object_id меняется только при одобрении (созданный или существующий объект), иначе остаётся прежним.
 -- name: SetSubmissionStatus :execrows
-UPDATE submissions
+UPDATE submission.submissions
 SET status = sqlc.arg(status), object_id = COALESCE(sqlc.narg(object_id), object_id)
 WHERE id = sqlc.arg(id);
 
 -- name: CreateModerationDecision :exec
-INSERT INTO moderation_decisions (submission_id, moderator_id, decision, reason)
+INSERT INTO submission.moderation_decisions (submission_id, moderator_id, decision, reason)
 VALUES ($1, $2, $3, $4);

@@ -11,11 +11,11 @@ import (
 )
 
 const claimDueOutboxEvents = `-- name: ClaimDueOutboxEvents :many
-UPDATE outbox_events
+UPDATE outbox.outbox_events
 SET attempts = attempts + 1,
     next_attempt_at = now() + make_interval(secs => $1::int)
 WHERE id IN (
-    SELECT id FROM outbox_events
+    SELECT id FROM outbox.outbox_events
     WHERE status = 'pending' AND next_attempt_at <= now()
     ORDER BY id
     LIMIT $2
@@ -66,7 +66,7 @@ func (q *Queries) ClaimDueOutboxEvents(ctx context.Context, arg ClaimDueOutboxEv
 
 const insertOutboxEvent = `-- name: InsertOutboxEvent :exec
 
-INSERT INTO outbox_events (event_type, payload) VALUES ($1, $2)
+INSERT INTO outbox.outbox_events (event_type, payload) VALUES ($1, $2)
 `
 
 type InsertOutboxEventParams struct {
@@ -82,7 +82,7 @@ func (q *Queries) InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventPa
 }
 
 const markOutboxEventDone = `-- name: MarkOutboxEventDone :exec
-UPDATE outbox_events SET status = 'done', processed_at = now(), last_error = '' WHERE id = $1
+UPDATE outbox.outbox_events SET status = 'done', processed_at = now(), last_error = '' WHERE id = $1
 `
 
 func (q *Queries) MarkOutboxEventDone(ctx context.Context, id int64) error {
@@ -91,7 +91,7 @@ func (q *Queries) MarkOutboxEventDone(ctx context.Context, id int64) error {
 }
 
 const markOutboxEventFailed = `-- name: MarkOutboxEventFailed :exec
-UPDATE outbox_events
+UPDATE outbox.outbox_events
 SET status = $1,
     last_error = $2,
     next_attempt_at = $3,

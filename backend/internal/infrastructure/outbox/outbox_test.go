@@ -28,7 +28,7 @@ type event struct {
 func eventsOf(t *testing.T, db *pgxpool.Pool, eventType string) []event {
 	t.Helper()
 	rows, err := db.Query(context.Background(),
-		`SELECT id, status, attempts, next_attempt_at, last_error FROM outbox_events WHERE event_type = $1 ORDER BY id`, eventType)
+		`SELECT id, status, attempts, next_attempt_at, last_error FROM outbox.outbox_events WHERE event_type = $1 ORDER BY id`, eventType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestPublishJoinsTransaction(t *testing.T) {
 		t.Fatalf("после фиксации: %+v", evs)
 	}
 	var n int
-	if err := db.QueryRow(ctx, `SELECT (payload->>'n')::int FROM outbox_events WHERE id = $1`, evs[0].ID).Scan(&n); err != nil || n != 2 {
+	if err := db.QueryRow(ctx, `SELECT (payload->>'n')::int FROM outbox.outbox_events WHERE id = $1`, evs[0].ID).Scan(&n); err != nil || n != 2 {
 		t.Fatalf("payload: n=%d err=%v", n, err)
 	}
 
@@ -200,7 +200,7 @@ func TestProcessorRetriesWithBackoffAndGivesUp(t *testing.T) {
 				t.Fatalf("попытка %d: status=%s, повтор через %v, ждали %v", attempt, e.Status, delay, want)
 			}
 			// Подгоняем срок повтора, чтобы не ждать минуты.
-			if _, err := db.Exec(ctx, `UPDATE outbox_events SET next_attempt_at = now() WHERE id = $1`, e.ID); err != nil {
+			if _, err := db.Exec(ctx, `UPDATE outbox.outbox_events SET next_attempt_at = now() WHERE id = $1`, e.ID); err != nil {
 				t.Fatal(err)
 			}
 		} else if e.Status != "failed" {
@@ -234,7 +234,7 @@ func TestProcessorRecoversFromPanicAndSucceedsOnRetry(t *testing.T) {
 	if e := eventsOf(t, db, typ)[0]; e.Status != "pending" || e.LastErr == "" {
 		t.Fatalf("после паники: %+v", e)
 	}
-	if _, err := db.Exec(ctx, `UPDATE outbox_events SET next_attempt_at = now() WHERE event_type = $1`, typ); err != nil {
+	if _, err := db.Exec(ctx, `UPDATE outbox.outbox_events SET next_attempt_at = now() WHERE event_type = $1`, typ); err != nil {
 		t.Fatal(err)
 	}
 	drain(t, proc)

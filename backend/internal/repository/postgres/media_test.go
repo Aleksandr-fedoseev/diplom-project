@@ -18,18 +18,18 @@ func TestMediaRepository(t *testing.T) {
 
 	// Автор, заявка и объект, к которым крепятся файлы. Заявки — чужой модуль, поэтому прямой SQL.
 	var userID, submissionID, objectID int64
-	if err := pool.QueryRow(ctx, `INSERT INTO users (email, password_hash, name, role) VALUES ($1, 'h', 'Автор', 'user') RETURNING id`,
+	if err := pool.QueryRow(ctx, `INSERT INTO auth.users (email, password_hash, name, role) VALUES ($1, 'h', 'Автор', 'user') RETURNING id`,
 		testdb.Unique("media")+"@example.ru").Scan(&userID); err != nil {
 		t.Fatal(err)
 	}
-	if err := pool.QueryRow(ctx, `INSERT INTO submissions (author_id, kind, title, source) VALUES ($1, 'new_object', 'Дом', 'Архив') RETURNING id`,
+	if err := pool.QueryRow(ctx, `INSERT INTO submission.submissions (author_id, kind, title, source) VALUES ($1, 'new_object', 'Дом', 'Архив') RETURNING id`,
 		userID).Scan(&submissionID); err != nil {
 		t.Fatal(err)
 	}
-	if err := pool.QueryRow(ctx, `SELECT id FROM heritage_objects WHERE slug = 'birzha'`).Scan(&objectID); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT id FROM catalog.heritage_objects WHERE slug = 'birzha'`).Scan(&objectID); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID) })
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM auth.users WHERE id = $1`, userID) })
 
 	partial, angle := media.ProjectionPartial, 120
 	pano, err := files.Create(ctx, media.File{

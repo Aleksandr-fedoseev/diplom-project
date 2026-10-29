@@ -13,7 +13,7 @@ import (
 )
 
 const createModerationDecision = `-- name: CreateModerationDecision :exec
-INSERT INTO moderation_decisions (submission_id, moderator_id, decision, reason)
+INSERT INTO submission.moderation_decisions (submission_id, moderator_id, decision, reason)
 VALUES ($1, $2, $3, $4)
 `
 
@@ -36,7 +36,7 @@ func (q *Queries) CreateModerationDecision(ctx context.Context, arg CreateModera
 
 const createSubmission = `-- name: CreateSubmission :one
 
-INSERT INTO submissions (author_id, kind, object_id, title, description, address, location, period, source)
+INSERT INTO submission.submissions (author_id, kind, object_id, title, description, address, location, period, source)
 VALUES (
     $1, $2, $3, $4, $5,
     $6,
@@ -89,8 +89,8 @@ SELECT
     COALESCE(ST_X(s.location::geometry), 0)::float8 AS lng,
     s.period, s.source, s.status, s.created_at,
     d.decision, d.reason, d.moderator_id, d.created_at AS decided_at
-FROM submissions s
-LEFT JOIN moderation_decisions d ON d.submission_id = s.id
+FROM submission.submissions s
+LEFT JOIN submission.moderation_decisions d ON d.submission_id = s.id
 WHERE s.id = $1
 `
 
@@ -151,8 +151,8 @@ SELECT
     COALESCE(ST_X(s.location::geometry), 0)::float8 AS lng,
     s.period, s.source, s.status, s.created_at,
     d.decision, d.reason, d.moderator_id, d.created_at AS decided_at
-FROM submissions s
-LEFT JOIN moderation_decisions d ON d.submission_id = s.id
+FROM submission.submissions s
+LEFT JOIN submission.moderation_decisions d ON d.submission_id = s.id
 WHERE s.author_id = $1
 ORDER BY s.created_at DESC, s.id DESC
 `
@@ -226,8 +226,8 @@ SELECT
     COALESCE(ST_X(s.location::geometry), 0)::float8 AS lng,
     s.period, s.source, s.status, s.created_at,
     d.decision, d.reason, d.moderator_id, d.created_at AS decided_at
-FROM submissions s
-LEFT JOIN moderation_decisions d ON d.submission_id = s.id
+FROM submission.submissions s
+LEFT JOIN submission.moderation_decisions d ON d.submission_id = s.id
 WHERE s.status = $1
 ORDER BY s.created_at, s.id
 LIMIT $3 OFFSET $2
@@ -308,7 +308,7 @@ SELECT
     COALESCE(ST_Y(location::geometry), 0)::float8 AS lat,
     COALESCE(ST_X(location::geometry), 0)::float8 AS lng,
     period, source, status, created_at
-FROM submissions
+FROM submission.submissions
 WHERE id = $1
 FOR UPDATE
 `
@@ -356,7 +356,7 @@ func (q *Queries) LockSubmission(ctx context.Context, id int64) (LockSubmissionR
 }
 
 const setSubmissionStatus = `-- name: SetSubmissionStatus :execrows
-UPDATE submissions
+UPDATE submission.submissions
 SET status = $1, object_id = COALESCE($2, object_id)
 WHERE id = $3
 `

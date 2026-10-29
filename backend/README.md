@@ -4,23 +4,49 @@
 файлы — S3-хранилище (SeaweedFS, клиент minio-go), маршруты по улицам — OSRM, оплата — ЮKassa,
 письма — SMTP.
 
-Модули (`internal/`):
+## Архитектура
 
-| Модуль | Что делает |
-| --- | --- |
-| `auth` | регистрация и вход, JWT, роли, блокировка, управление пользователями |
-| `catalog` | объекты и категории, геопоиск (PostGIS); владелец таблиц объектов |
-| `routes` | тематические и пользовательские маршруты, линия по улицам через OSRM |
-| `media` | фото, аудио и 3D в S3-хранилище; файлы объектов и заявок |
-| `submissions` | заявки пользователей и модерация: одобрение с публикацией, отказ с причиной |
-| `shop` | товары, корзина, заказы, оплата через ЮKassa и её уведомления (webhook) |
-| `notifications` | очередь писем в БД и фоновая отправка с повторными попытками |
+Модульный монолит, разложенный по слоям чистой архитектуры: одно приложение, один процесс, одна БД.
+Код разделён по **слоям**, внутри каждого слоя — по **модулям**:
 
-Архитектура — модульный монолит: модули поделены по предметным областям, внутри каждого слои
-`handler.go` (HTTP) → `service.go` (логика) → `store/` (доступ к БД, код генерирует sqlc).
-Модуль работает только со своими таблицами, а сведения из других модулей получает через их
-сервисы — небольшие интерфейсы объявлены в модуле-потребителе (например, `routes.Places`,
-`media.Objects`). Все модули собираются в `cmd/server/main.go`.
+```
+cmd/server/main.go          ← сигналы ОС, настройки, app.New(...).Run(ctx)
+migrations/                 ← SQL-миграции goose (вшиты в бинарник) — они же схема для sqlc
+internal/
+├── app/                    ← сборка и жизненный цикл: единственное место, где создаются конкретные типы
+│   ├── wiring.go           ← репозитории → сервисы → обработчики
+│   └── adapters.go         ← переводчики между портами модулей
+├── domain/<модуль>/        ← сущности, правила, ошибки, интерфейсы репозиториев и сервиса
+├── service/<модуль>/       ← сценарии; техника и другие модули — через интерфейсы в ports.go
+├── repository/postgres/    ← репозитории; SQL в queries/<модуль>.sql, код — sqlc в пакет sqlc
+├── infrastructure/         ← техника без знания домена: postgres, s3, osrm, yookassa, smtp,
+│                             security (bcrypt, JWT), outbox, config
+└── transport/http/         ← роутер, middleware, обработчики модулей; ошибки домена → HTTP-коды
+```
+
+Направление зависимостей: `transport → service → domain ← repository/infrastructure`.
+Домен импортирует только стандартную библиотеку. Модули не импортируют друг друга: каждый объявляет
+маленький интерфейс в своём `ports.go`, а `app/adapters.go` подставляет реализацию другого модуля.
+
+| Модуль | Что делает | Схема БД |
+| --- | --- | --- |
+| `auth` | регистрация, вход, JWT, роли, блокировка, управление пользователями | `auth` |
+| `catalog` | объекты и категории, геопоиск PostGIS (радиус, видимая область карты) | `catalog` |
+| `media` | фото, аудио, 3D и панорамы в S3; пометка «реконструкция ИИ» | `media` |
+| `route` | тематические и свои маршруты, линия по улицам через OSRM | `route` |
+| `submission` | заявки и модерация: одобрение с публикацией, отказ с причиной | `submission` |
+| `shop` | товары, корзина, заказы, оплата ЮKassa | `shop` |
+| `notification` | письма по событиям из outbox (без HTTP) | — |
+
+**Транзакции.** Сервис открывает транзакцию через порт `TxManager.Do(ctx, fn)`; реализация
+(`infrastructure/postgres`) кладёт её в `ctx`, а все репозитории берут соединение функцией `Conn`
+(транзакция, если есть, иначе пул). Так одно одобрение заявки создаёт объект в каталоге, переносит
+файлы и записывает решение атомарно, хотя это три разных модуля.
+
+**События (outbox).** Побочные эффекты между модулями — через события, записанные в той же транзакции
+(`outbox.outbox_events`). Фоновый обработчик доставляет их подписчикам (сейчас — модулю notification)
+с повторами через 1, 4, 9, 16 минут; доставка «хотя бы один раз». События: `submission.approved`,
+`submission.rejected`, `order.placed`, `order.paid`, `order.shipped`, `order.cancelled`.
 
 ## Запуск
 
@@ -48,32 +74,32 @@ curl http://localhost:8080/api/health
 go run ./cmd/server
 ```
 
-Переменные окружения описаны в `internal/config/config.go`.
+Переменные окружения описаны в `internal/infrastructure/config/config.go`.
 
 ## Как читать код
 
-Начните с `cmd/server/main.go` — там видно, как собирается приложение. Дальше по порядку:
+Начните с `cmd/server/main.go` и `internal/app/wiring.go` — там видно, как собирается приложение.
+Модуль удобно читать сверху вниз на примере `auth`: `domain/auth` → `service/auth` (и его тесты на
+фейках) → `repository/postgres/users.go` → `transport/http/auth`.
 
 | Файл | Что посмотреть |
 | --- | --- |
-| `internal/config/config.go` | настройки из переменных окружения, проверка обязательных |
-| `internal/database/migrations/*.sql` | схема БД; PostGIS-тип `geography`, GIST-индекс |
-| `internal/database/database.go` | пул соединений pgx, миграции goose, `go:embed` |
-| `internal/httpx/httpx.go` | обработчик, возвращающий `error`; ошибки для клиента и для лога |
-| `internal/server/server.go` | маршрутизатор chi, цепочка middleware |
-| `internal/auth/` | bcrypt, JWT, middleware `Authenticate` и `RequireRole` |
-| `internal/catalog/queries.sql` | геопоиск: `ST_DWithin`, `ST_MakeEnvelope`, необязательные фильтры через `sqlc.narg` |
-| `internal/media/service.go` | потоковая загрузка в S3-хранилище, проверка типа по содержимому, Range-запросы |
-| `internal/osrm/client.go` | HTTP-клиент к внешнему сервису с таймаутом |
-| `internal/routes/service.go` | транзакция: маршрут и его точки сохраняются вместе; остановки — у каталога |
-| `internal/submissions/service.go` | одобрение в одной транзакции: объект, файлы, решение, письмо; `FOR UPDATE` |
-| `internal/shop/service.go` | оформление заказа: блокировка остатков, снимок цен; webhook ЮKassa с перепроверкой |
-| `internal/notifications/service.go` | очередь писем: `FOR UPDATE SKIP LOCKED`, аренда, повтор через 1, 4, 9, 16 минут |
+| `internal/domain/errs/errs.go` | ошибки домена с родом; перевод в HTTP — в `transport/http/httpx` |
+| `internal/infrastructure/postgres/tx.go` | `TxManager.Do`, транзакция в `ctx`, вложенные транзакции |
+| `internal/transport/http/middleware/auth.go` | проверка токена и ролей |
+| `internal/repository/postgres/queries/catalog.sql` | геопоиск: `ST_DWithin`, `ST_MakeEnvelope`, необязательные фильтры |
+| `internal/domain/media/file.go` | правила файлов: типы по содержимому, панорамы, кто видит файл заявки |
+| `internal/service/submission/moderation.go` | одобрение и отказ в одной транзакции, `FOR UPDATE`, событие |
+| `internal/service/shop/orders.go` | заказ: блокировка остатков, снимок цен, webhook ЮKassa с перепроверкой |
+| `internal/infrastructure/outbox/` | очередь событий: `FOR UPDATE SKIP LOCKED`, аренда, повторы |
+| `migrations/00006_module_schemas.sql` | таблицы модулей разнесены по схемам БД |
 
 ## SQL-запросы и sqlc
 
-В Go-коде нет SQL: запросы каждого модуля лежат в его `queries.sql`, а Go-функции для них
-(пакет `store` модуля) генерирует [sqlc](https://sqlc.dev) по схеме из миграций. Настройки — `sqlc.yaml`.
+В Go-коде нет SQL: запросы лежат в `internal/repository/postgres/queries/<модуль>.sql`, а Go-функции
+для них (один пакет `internal/repository/postgres/sqlc`) генерирует [sqlc](https://sqlc.dev) по схеме
+из миграций. Настройки — `sqlc.yaml`. Модели sqlc не выходят за `repository/postgres`: наружу
+репозитории отдают сущности домена.
 После изменения запросов или миграций:
 
 ```bash
@@ -84,8 +110,11 @@ go tool sqlc generate
 
 ## Тесты
 
-Интеграционные тесты работают с настоящей PostgreSQL (без неё пропускаются), миграции применяют сами.
-S3-хранилище и OSRM в тестах заменены поддельными реализациями.
+- **Домен и сервисы** — юнит-тесты без БД и HTTP: репозитории и порты заменены фейками в памяти.
+  Запускаются всегда: `go test ./internal/domain/... ./internal/service/...`.
+- **Репозитории, outbox, транзакции** — интеграционные тесты на настоящей PostgreSQL
+  (без `TEST_DATABASE_URL` пропускаются), миграции применяют сами.
+- **Обработчики** — `httptest` с фейковым сервисом: права, коды ответов, формат JSON.
 
 ```bash
 docker run -d --name heritage-test-db -e POSTGRES_USER=heritage -e POSTGRES_PASSWORD=test \
@@ -97,7 +126,7 @@ TEST_DATABASE_URL=postgres://heritage:test@localhost:5434/heritage?sslmode=disab
 
 ## Почта и оплата
 
-- **Письма.** Модули ставят письмо в очередь (`email_jobs`), фоновый обработчик отправляет его
+- **Письма.** Модули пишут события в outbox, модуль notification превращает их в письма и отправляет
   через SMTP. Без `SMTP_HOST` письма только пишутся в лог бэкенда — удобно при разработке.
 - **ЮKassa.** Без `YOOKASSA_SHOP_ID` заказы оформляются, но ссылки на оплату нет
   (`POST /api/orders/{id}/pay` отвечает 503). Для проверки — тестовый магазин ЮKassa.
@@ -127,7 +156,7 @@ TEST_DATABASE_URL=postgres://heritage:test@localhost:5434/heritage?sslmode=disab
 | POST | `/api/objects` | модератор | создать объект |
 | PUT | `/api/objects/{id}` | модератор | изменить объект |
 | DELETE | `/api/objects/{id}` | администратор | удалить объект |
-| POST | `/api/objects/{id}/media` | модератор | загрузить файл: форма `kind`, `caption`, `yearTaken`, `source`, `file` |
+| POST | `/api/objects/{id}/media` | модератор | загрузить файл: форма `kind`, `caption`, `yearTaken`, `sourceNote`, `source`, `projection`, `hAngle`, `author`, `license`, `file` |
 | GET | `/api/media/{id}/file` | все | скачать файл (Range); файл заявки — только автор и модераторы |
 | DELETE | `/api/media/{id}` | модератор | удалить файл |
 | GET | `/api/routes` | все | тематические маршруты |
@@ -163,6 +192,11 @@ TEST_DATABASE_URL=postgres://heritage:test@localhost:5434/heritage?sslmode=disab
 
 Виды файлов (`kind`): `photo`, `archive_photo` (до 15 МБ, JPEG/PNG/WebP), `audio` (до 40 МБ),
 `model3d` (до 50 МБ, только `.glb`).
+
+Панорамы (`kind=panorama`, JPEG/WebP до 30 МБ): `projection` — `full_360` (полная сфера) или `partial`
+(часть круга, угол обзора в градусах — `hAngle`). У каждого файла `source` — `photo` или
+`ai_reconstruction`: изображения, созданные нейросетью, сайт помечает как «реконструкция ИИ».
+`sourceNote` — откуда материал (архив, книга), `author` и `license` — автор и лицензия.
 
 Деньги в API — целые копейки (`450000` = 4500 ₽), чтобы не было ошибок округления.
 

@@ -12,7 +12,7 @@ import (
 
 const createRoute = `-- name: CreateRoute :one
 
-INSERT INTO routes (slug, title, description, owner_id, distance_m, duration_s, geometry)
+INSERT INTO route.routes (slug, title, description, owner_id, distance_m, duration_s, geometry)
 VALUES ($1, $2, $3, $4,
         $5, $6, ST_GeomFromGeoJSON($7::text)::geography)
 RETURNING id
@@ -46,7 +46,7 @@ func (q *Queries) CreateRoute(ctx context.Context, arg CreateRouteParams) (int64
 }
 
 const createRoutePoint = `-- name: CreateRoutePoint :exec
-INSERT INTO route_points (route_id, position, object_id) VALUES ($1, $2, $3)
+INSERT INTO route.route_points (route_id, position, object_id) VALUES ($1, $2, $3)
 `
 
 type CreateRoutePointParams struct {
@@ -61,7 +61,7 @@ func (q *Queries) CreateRoutePoint(ctx context.Context, arg CreateRoutePointPara
 }
 
 const deleteRoute = `-- name: DeleteRoute :exec
-DELETE FROM routes WHERE id = $1
+DELETE FROM route.routes WHERE id = $1
 `
 
 func (q *Queries) DeleteRoute(ctx context.Context, id int64) error {
@@ -72,7 +72,7 @@ func (q *Queries) DeleteRoute(ctx context.Context, id int64) error {
 const getRouteBySlug = `-- name: GetRouteBySlug :one
 SELECT id, slug, title, description, owner_id, distance_m, duration_s, created_at,
        ST_AsGeoJSON(geometry)::text AS geometry
-FROM routes WHERE slug = $1
+FROM route.routes WHERE slug = $1
 `
 
 type GetRouteBySlugRow struct {
@@ -105,7 +105,7 @@ func (q *Queries) GetRouteBySlug(ctx context.Context, slug string) (GetRouteBySl
 }
 
 const getRouteOwner = `-- name: GetRouteOwner :one
-SELECT owner_id FROM routes WHERE id = $1
+SELECT owner_id FROM route.routes WHERE id = $1
 `
 
 func (q *Queries) GetRouteOwner(ctx context.Context, id int64) (*int64, error) {
@@ -116,7 +116,7 @@ func (q *Queries) GetRouteOwner(ctx context.Context, id int64) (*int64, error) {
 }
 
 const listRoutePoints = `-- name: ListRoutePoints :many
-SELECT route_id, object_id, position FROM route_points
+SELECT route_id, object_id, position FROM route.route_points
 WHERE route_id = ANY($1::bigint[])
 ORDER BY route_id, position
 `
@@ -152,7 +152,7 @@ func (q *Queries) ListRoutePoints(ctx context.Context, routeIds []int64) ([]List
 
 const listRoutesByOwner = `-- name: ListRoutesByOwner :many
 SELECT id, slug, title, description, owner_id, distance_m, duration_s, created_at
-FROM routes WHERE owner_id = $1 ORDER BY created_at DESC
+FROM route.routes WHERE owner_id = $1 ORDER BY created_at DESC
 `
 
 type ListRoutesByOwnerRow struct {
@@ -197,7 +197,7 @@ func (q *Queries) ListRoutesByOwner(ctx context.Context, ownerID *int64) ([]List
 
 const listThematicRoutes = `-- name: ListThematicRoutes :many
 SELECT id, slug, title, description, owner_id, distance_m, duration_s, created_at
-FROM routes WHERE owner_id IS NULL ORDER BY title
+FROM route.routes WHERE owner_id IS NULL ORDER BY title
 `
 
 type ListThematicRoutesRow struct {

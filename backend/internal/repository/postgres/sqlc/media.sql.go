@@ -10,7 +10,7 @@ import (
 )
 
 const attachMediaFilesToObject = `-- name: AttachMediaFilesToObject :exec
-UPDATE media_files SET object_id = $1 WHERE submission_id = $2
+UPDATE media.media_files SET object_id = $1 WHERE submission_id = $2
 `
 
 type AttachMediaFilesToObjectParams struct {
@@ -26,7 +26,7 @@ func (q *Queries) AttachMediaFilesToObject(ctx context.Context, arg AttachMediaF
 
 const createMediaFile = `-- name: CreateMediaFile :one
 
-INSERT INTO media_files
+INSERT INTO media.media_files
     (object_id, submission_id, kind, storage_key, original_name, content_type, size_bytes,
      caption, year_taken, source_note, source, projection, h_angle, author, license, uploaded_by)
 VALUES (
@@ -102,7 +102,7 @@ func (q *Queries) CreateMediaFile(ctx context.Context, arg CreateMediaFileParams
 }
 
 const deleteMediaFile = `-- name: DeleteMediaFile :execrows
-DELETE FROM media_files WHERE id = $1
+DELETE FROM media.media_files WHERE id = $1
 `
 
 func (q *Queries) DeleteMediaFile(ctx context.Context, id int64) (int64, error) {
@@ -114,7 +114,7 @@ func (q *Queries) DeleteMediaFile(ctx context.Context, id int64) (int64, error) 
 }
 
 const getMediaFile = `-- name: GetMediaFile :one
-SELECT id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source_note, projection, h_angle, source, author, license FROM media_files WHERE id = $1
+SELECT id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source_note, projection, h_angle, source, author, license FROM media.media_files WHERE id = $1
 `
 
 func (q *Queries) GetMediaFile(ctx context.Context, id int64) (MediaFile, error) {
@@ -144,7 +144,7 @@ func (q *Queries) GetMediaFile(ctx context.Context, id int64) (MediaFile, error)
 }
 
 const listMediaFilesByObject = `-- name: ListMediaFilesByObject :many
-SELECT id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source_note, projection, h_angle, source, author, license FROM media_files WHERE object_id = $1 ORDER BY kind, id
+SELECT id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source_note, projection, h_angle, source, author, license FROM media.media_files WHERE object_id = $1 ORDER BY kind, id
 `
 
 func (q *Queries) ListMediaFilesByObject(ctx context.Context, objectID *int64) ([]MediaFile, error) {
@@ -187,7 +187,7 @@ func (q *Queries) ListMediaFilesByObject(ctx context.Context, objectID *int64) (
 }
 
 const listMediaFilesBySubmission = `-- name: ListMediaFilesBySubmission :many
-SELECT id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source_note, projection, h_angle, source, author, license FROM media_files WHERE submission_id = $1 ORDER BY id
+SELECT id, object_id, kind, storage_key, original_name, content_type, size_bytes, caption, uploaded_by, created_at, submission_id, year_taken, source_note, projection, h_angle, source, author, license FROM media.media_files WHERE submission_id = $1 ORDER BY id
 `
 
 func (q *Queries) ListMediaFilesBySubmission(ctx context.Context, submissionID *int64) ([]MediaFile, error) {
