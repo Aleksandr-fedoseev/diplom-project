@@ -16,8 +16,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"heritage-backend/internal/catalog"
 	"heritage-backend/internal/httpx"
 	"heritage-backend/internal/osrm"
+	"heritage-backend/internal/routes/store"
 )
 
 const maxStops = 25
@@ -44,13 +46,22 @@ type Route struct {
 	CreatedAt   *time.Time      `json:"createdAt,omitempty"`
 }
 
-type Service struct {
-	db   *pgxpool.Pool
-	osrm *osrm.Client
+// Places — то, что маршрутам нужно от каталога: координаты и названия объектов.
+// Реализует catalog.Service; таблицу объектов модуль маршрутов сам не читает.
+type Places interface {
+	PublishedPlaces(ctx context.Context, slugs []string) ([]catalog.Place, error)
+	PlacesByIDs(ctx context.Context, ids []int64) ([]catalog.Place, error)
 }
 
-func NewService(db *pgxpool.Pool, client *osrm.Client) *Service {
-	return &Service{db: db, osrm: client}
+type Service struct {
+	db     *pgxpool.Pool  // нужен только для транзакций
+	q      *store.Queries // запросы из queries.sql, код сгенерирован sqlc
+	places Places
+	osrm   *osrm.Client
+}
+
+func NewService(db *pgxpool.Pool, places Places, client *osrm.Client) *Service {
+	return &Service{db: db, q: store.New(db), places: places, osrm: client}
 }
 
 // Build находит объекты по slug в заданном порядке и строит по ним маршрут, ничего не сохраняя.
@@ -60,23 +71,13 @@ func (s *Service) Build(ctx context.Context, slugs []string) (Route, error) {
 		return Route{}, httpx.BadRequest(fmt.Sprintf("в маршруте должно быть от 2 до %d объектов", maxStops))
 	}
 
-	rows, err := s.db.Query(ctx, `
-		SELECT id, slug, title, ST_Y(location::geometry), ST_X(location::geometry)
-		FROM heritage_objects WHERE slug = ANY($1) AND is_published`, slugs)
-	if err != nil {
-		return Route{}, err
-	}
-	found, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Stop, error) {
-		var st Stop
-		err := row.Scan(&st.ObjectID, &st.Slug, &st.Title, &st.Lat, &st.Lng)
-		return st, err
-	})
+	found, err := s.places.PublishedPlaces(ctx, slugs)
 	if err != nil {
 		return Route{}, err
 	}
 	bySlug := make(map[string]Stop, len(found))
-	for _, st := range found {
-		bySlug[st.Slug] = st
+	for _, p := range found {
+		bySlug[p.Slug] = stopFromPlace(p)
 	}
 
 	// Восстанавливаем порядок, который задал пользователь: БД возвращает строки в произвольном порядке.
@@ -132,13 +133,16 @@ func (s *Service) Save(ctx context.Context, in SaveInput, ownerID *int64) (Route
 	}
 	defer func() { _ = tx.Rollback(ctx) }() // после Commit ничего не делает
 
-	var id int64
-	err = tx.QueryRow(ctx, `
-		INSERT INTO routes (slug, title, description, owner_id, distance_m, duration_s, geometry)
-		VALUES ($1, $2, $3, $4, $5, $6, ST_GeomFromGeoJSON($7)::geography)
-		RETURNING id`,
-		in.Slug, in.Title, in.Description, ownerID, built.DistanceM, built.DurationS, string(built.Geometry),
-	).Scan(&id)
+	qtx := s.q.WithTx(tx)
+	id, err := qtx.CreateRoute(ctx, store.CreateRouteParams{
+		Slug:        in.Slug,
+		Title:       in.Title,
+		Description: in.Description,
+		OwnerID:     ownerID,
+		DistanceM:   built.DistanceM,
+		DurationS:   built.DurationS,
+		Geometry:    string(built.Geometry),
+	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return Route{}, httpx.Conflict("маршрут с таким slug уже есть")
@@ -148,8 +152,10 @@ func (s *Service) Save(ctx context.Context, in SaveInput, ownerID *int64) (Route
 	}
 
 	for _, st := range built.Stops {
-		if _, err := tx.Exec(ctx, `INSERT INTO route_points (route_id, position, object_id) VALUES ($1, $2, $3)`,
-			id, st.Position, st.ObjectID); err != nil {
+		err := qtx.CreateRoutePoint(ctx, store.CreateRoutePointParams{
+			RouteID: id, Position: int32(st.Position), ObjectID: st.ObjectID,
+		})
+		if err != nil {
 			return Route{}, err
 		}
 	}
@@ -159,78 +165,98 @@ func (s *Service) Save(ctx context.Context, in SaveInput, ownerID *int64) (Route
 	return s.Get(ctx, in.Slug)
 }
 
-const routeColumns = `id, slug, title, description, owner_id, distance_m, duration_s, created_at`
-
 // ListThematic — тематические маршруты без линий (для списка линии не нужны, они тяжёлые).
 func (s *Service) ListThematic(ctx context.Context) ([]Route, error) {
-	return s.list(ctx, `WHERE owner_id IS NULL ORDER BY title`)
+	rows, err := s.q.ListThematicRoutes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	list := make([]Route, len(rows))
+	for i, r := range rows {
+		list[i] = Route{ID: r.ID, Slug: r.Slug, Title: r.Title, Description: r.Description, OwnerID: r.OwnerID,
+			DistanceM: r.DistanceM, DurationS: r.DurationS, CreatedAt: &r.CreatedAt}
+	}
+	return list, s.fillStops(ctx, list)
 }
 
 func (s *Service) ListByOwner(ctx context.Context, ownerID int64) ([]Route, error) {
-	return s.list(ctx, `WHERE owner_id = $1 ORDER BY created_at DESC`, ownerID)
-}
-
-func (s *Service) list(ctx context.Context, tail string, args ...any) ([]Route, error) {
-	rows, err := s.db.Query(ctx, `SELECT `+routeColumns+` FROM routes `+tail, args...)
+	rows, err := s.q.ListRoutesByOwner(ctx, &ownerID)
 	if err != nil {
 		return nil, err
 	}
-	list, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Route, error) {
-		var r Route
-		r.CreatedAt = new(time.Time)
-		err := row.Scan(&r.ID, &r.Slug, &r.Title, &r.Description, &r.OwnerID, &r.DistanceM, &r.DurationS, r.CreatedAt)
-		return r, err
-	})
-	if err != nil {
-		return nil, err
+	list := make([]Route, len(rows))
+	for i, r := range rows {
+		list[i] = Route{ID: r.ID, Slug: r.Slug, Title: r.Title, Description: r.Description, OwnerID: r.OwnerID,
+			DistanceM: r.DistanceM, DurationS: r.DurationS, CreatedAt: &r.CreatedAt}
 	}
-	for i := range list {
-		if list[i].Stops, err = s.stops(ctx, list[i].ID); err != nil {
-			return nil, err
-		}
-	}
-	return list, nil
+	return list, s.fillStops(ctx, list)
 }
 
 // Get возвращает маршрут целиком: с линией и остановками.
 func (s *Service) Get(ctx context.Context, slug string) (Route, error) {
-	var (
-		r        Route
-		geometry string
-	)
-	r.CreatedAt = new(time.Time)
-	err := s.db.QueryRow(ctx, `SELECT `+routeColumns+`, ST_AsGeoJSON(geometry) FROM routes WHERE slug = $1`, slug).
-		Scan(&r.ID, &r.Slug, &r.Title, &r.Description, &r.OwnerID, &r.DistanceM, &r.DurationS, r.CreatedAt, &geometry)
+	r, err := s.q.GetRouteBySlug(ctx, slug)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Route{}, httpx.NotFound("маршрут не найден")
 	}
 	if err != nil {
 		return Route{}, err
 	}
-	r.Geometry = json.RawMessage(geometry)
-	r.Stops, err = s.stops(ctx, r.ID)
-	return r, err
+	route := []Route{{ID: r.ID, Slug: r.Slug, Title: r.Title, Description: r.Description, OwnerID: r.OwnerID,
+		DistanceM: r.DistanceM, DurationS: r.DurationS, CreatedAt: &r.CreatedAt, Geometry: json.RawMessage(r.Geometry)}}
+	return route[0], s.fillStops(ctx, route)
 }
 
-func (s *Service) stops(ctx context.Context, routeID int64) ([]Stop, error) {
-	rows, err := s.db.Query(ctx, `
-		SELECT p.position, o.id, o.slug, o.title, ST_Y(o.location::geometry), ST_X(o.location::geometry)
-		FROM route_points p JOIN heritage_objects o ON o.id = p.object_id
-		WHERE p.route_id = $1 ORDER BY p.position`, routeID)
-	if err != nil {
-		return nil, err
+// fillStops заполняет остановки сразу для всех маршрутов списка: один запрос за точками
+// и один к каталогу за объектами, а не по запросу на каждый маршрут.
+func (s *Service) fillStops(ctx context.Context, list []Route) error {
+	if len(list) == 0 {
+		return nil
 	}
-	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Stop, error) {
-		var st Stop
-		err := row.Scan(&st.Position, &st.ObjectID, &st.Slug, &st.Title, &st.Lat, &st.Lng)
-		return st, err
-	})
+	routeIDs := make([]int64, len(list))
+	for i, r := range list {
+		routeIDs[i] = r.ID
+	}
+	points, err := s.q.ListRoutePoints(ctx, routeIDs)
+	if err != nil {
+		return err
+	}
+
+	objectIDs := make([]int64, 0, len(points))
+	for _, p := range points {
+		objectIDs = append(objectIDs, p.ObjectID)
+	}
+	places, err := s.places.PlacesByIDs(ctx, objectIDs)
+	if err != nil {
+		return err
+	}
+	byID := make(map[int64]catalog.Place, len(places))
+	for _, p := range places {
+		byID[p.ID] = p
+	}
+
+	// Точки приходят отсортированными по маршруту и номеру остановки.
+	stops := make(map[int64][]Stop, len(list))
+	for _, p := range points {
+		st := stopFromPlace(byID[p.ObjectID])
+		st.Position = int(p.Position)
+		stops[p.RouteID] = append(stops[p.RouteID], st)
+	}
+	for i := range list {
+		list[i].Stops = stops[list[i].ID]
+		if list[i].Stops == nil {
+			list[i].Stops = []Stop{}
+		}
+	}
+	return nil
+}
+
+func stopFromPlace(p catalog.Place) Stop {
+	return Stop{ObjectID: p.ID, Slug: p.Slug, Title: p.Title, Lat: p.Lat, Lng: p.Lng}
 }
 
 // Delete удаляет маршрут. Свой маршрут может удалить владелец, тематический — только администратор.
 func (s *Service) Delete(ctx context.Context, id int64, userID int64, isAdmin bool) error {
-	var ownerID *int64
-	err := s.db.QueryRow(ctx, `SELECT owner_id FROM routes WHERE id = $1`, id).Scan(&ownerID)
+	ownerID, err := s.q.GetRouteOwner(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return httpx.NotFound("маршрут не найден")
 	}
@@ -241,6 +267,5 @@ func (s *Service) Delete(ctx context.Context, id int64, userID int64, isAdmin bo
 	if !isOwner && !isAdmin {
 		return httpx.Forbidden("удалить можно только свой маршрут")
 	}
-	_, err = s.db.Exec(ctx, `DELETE FROM routes WHERE id = $1`, id)
-	return err
+	return s.q.DeleteRoute(ctx, id)
 }

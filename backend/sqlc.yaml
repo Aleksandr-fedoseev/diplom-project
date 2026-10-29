@@ -1,0 +1,68 @@
+# Настройки генерации кода доступа к БД.
+# SQL-запросы лежат в файле queries.sql каждого модуля, схема берётся из миграций.
+# Каждый модуль получает свой пакет store только со своими запросами.
+# После изменения запросов или миграций: go tool sqlc generate
+version: "2"
+
+sql:
+  - engine: postgresql
+    schema: internal/database/migrations
+    queries: internal/auth/queries.sql
+    gen:
+      go: &go
+        package: store
+        out: internal/auth/store
+        sql_package: pgx/v5
+        omit_unused_structs: true # в пакет модуля попадают только его таблицы
+        emit_pointers_for_null_types: true # NULL в БД — nil в Go
+        overrides:
+          - db_type: timestamptz
+            go_type: time.Time
+
+  - engine: postgresql
+    schema: internal/database/migrations
+    queries: internal/catalog/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/catalog/store
+
+  - engine: postgresql
+    schema: internal/database/migrations
+    queries: internal/media/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/media/store
+
+  - engine: postgresql
+    schema: internal/database/migrations
+    queries: internal/routes/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/routes/store
+
+  - engine: postgresql
+    schema: internal/database/migrations
+    queries: internal/notifications/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/notifications/store
+
+  - engine: postgresql
+    schema: internal/database/migrations
+    queries: internal/submissions/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/submissions/store
+
+  - engine: postgresql
+    schema: internal/database/migrations
+    queries: internal/shop/queries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/shop/store

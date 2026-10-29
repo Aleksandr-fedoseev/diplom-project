@@ -14,6 +14,8 @@ import (
 	"heritage-backend/internal/httpx"
 	"heritage-backend/internal/media"
 	"heritage-backend/internal/routes"
+	"heritage-backend/internal/shop"
+	"heritage-backend/internal/submissions"
 )
 
 type Deps struct {
@@ -21,10 +23,12 @@ type Deps struct {
 	Tokens      *auth.TokenIssuer
 	CORSOrigins []string
 
-	Auth    *auth.Handler
-	Catalog *catalog.Handler
-	Media   *media.Handler
-	Routes  *routes.Handler
+	Auth        *auth.Handler
+	Catalog     *catalog.Handler
+	Media       *media.Handler
+	Routes      *routes.Handler
+	Submissions *submissions.Handler
+	Shop        *shop.Handler
 }
 
 func New(d Deps) http.Handler {
@@ -52,9 +56,12 @@ func New(d Deps) http.Handler {
 		}))
 
 		r.Route("/auth", d.Auth.Routes)
+		r.Route("/admin/users", d.Auth.AdminRoutes)
 		r.Route("/media", d.Media.Routes)
 		d.Catalog.Routes(r)
 		d.Routes.Routes(r)
+		d.Submissions.Routes(r)
+		d.Shop.Routes(r)
 	})
 	return r
 }

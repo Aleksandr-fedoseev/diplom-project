@@ -31,6 +31,20 @@ type Config struct {
 	// Первый администратор создаётся при старте, если такого email ещё нет.
 	AdminEmail    string
 	AdminPassword string
+
+	// SMTP для уведомлений. Без SMTP_HOST письма не отправляются, а пишутся в лог.
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUser     string
+	SMTPPassword string
+	SMTPFrom     string
+
+	// ЮKassa. Без YOOKASSA_SHOP_ID заказы создаются, но оплату принять нельзя.
+	YooKassaShopID    string
+	YooKassaSecretKey string
+	YooKassaReturnURL string // куда ЮKassa вернёт покупателя после оплаты
+
+	PublicURL string // адрес сайта для ссылок в письмах
 }
 
 func Load() (Config, error) {
@@ -49,6 +63,18 @@ func Load() (Config, error) {
 		OSRMURL:        getEnv("OSRM_URL", "https://routing.openstreetmap.de/routed-foot"),
 		AdminEmail:     os.Getenv("ADMIN_EMAIL"),
 		AdminPassword:  os.Getenv("ADMIN_PASSWORD"),
+
+		SMTPHost:     os.Getenv("SMTP_HOST"),
+		SMTPPort:     getInt("SMTP_PORT", 587),
+		SMTPUser:     os.Getenv("SMTP_USER"),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:     getEnv("SMTP_FROM", "noreply@localhost"),
+
+		YooKassaShopID:    os.Getenv("YOOKASSA_SHOP_ID"),
+		YooKassaSecretKey: os.Getenv("YOOKASSA_SECRET_KEY"),
+		YooKassaReturnURL: getEnv("YOOKASSA_RETURN_URL", "http://localhost:3000/shop/orders"),
+
+		PublicURL: getEnv("PUBLIC_URL", "http://localhost:3000"),
 	}
 
 	// Без этих значений приложение работать не может — лучше упасть сразу при старте.

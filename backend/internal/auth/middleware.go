@@ -54,6 +54,9 @@ func Authenticate(tokens *TokenIssuer) func(http.Handler) http.Handler {
 	}
 }
 
+// AtLeast — роль не ниже minRole: модератор может всё, что пользователь, и т. д.
+func AtLeast(role, minRole string) bool { return roleLevel[role] >= roleLevel[minRole] }
+
 // RequireRole пропускает только пользователей с ролью не ниже minRole.
 func RequireRole(minRole string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -63,7 +66,7 @@ func RequireRole(minRole string) func(http.Handler) http.Handler {
 				httpx.WriteError(w, r, httpx.Unauthorized("требуется вход"))
 				return
 			}
-			if roleLevel[p.Role] < roleLevel[minRole] {
+			if !AtLeast(p.Role, minRole) {
 				httpx.WriteError(w, r, httpx.Forbidden("недостаточно прав"))
 				return
 			}
