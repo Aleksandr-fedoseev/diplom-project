@@ -81,16 +81,27 @@ func (s *Service) submissionRejected(ctx context.Context, ev notification.Submis
 	})
 }
 
-// В событии order.placed нет состава заказа и адреса (см. контракт), поэтому письмо короче,
-// чем в старом модуле shop: номер, сумма и что делать дальше.
+// Состав заказа и адрес в событии необязательны: если их нет, соответствующих строк в письме тоже нет.
 func (s *Service) orderPlaced(ctx context.Context, ev notification.OrderPlaced) error {
 	if ev.OrderID == 0 {
 		return fmt.Errorf("%w: нет orderId", notification.ErrMalformedEvent)
 	}
 	return s.send(ctx, ev.UserID, func(name string) (string, string) {
-		return fmt.Sprintf("Заказ №%d оформлен", ev.OrderID), greeting(name) +
-			fmt.Sprintf("Ваш заказ №%d оформлен.\n\nИтого: %s ₽\n\nЗаказ будет передан в доставку после оплаты.\n",
-				ev.OrderID, notification.FormatRubles(ev.TotalKopecks))
+		var b strings.Builder
+		b.WriteString(greeting(name))
+		fmt.Fprintf(&b, "Ваш заказ №%d оформлен.\n\n", ev.OrderID)
+		for _, it := range ev.Items {
+			fmt.Fprintf(&b, "%s — %d шт. × %s ₽\n", it.Title, it.Quantity, notification.FormatRubles(it.PriceKopecks))
+		}
+		if len(ev.Items) > 0 {
+			b.WriteString("\n")
+		}
+		fmt.Fprintf(&b, "Итого: %s ₽\n", notification.FormatRubles(ev.TotalKopecks))
+		if ev.DeliveryAddress != "" {
+			fmt.Fprintf(&b, "Адрес доставки: %s\n", ev.DeliveryAddress)
+		}
+		b.WriteString("\nЗаказ будет передан в доставку после оплаты.\n")
+		return fmt.Sprintf("Заказ №%d оформлен", ev.OrderID), b.String()
 	})
 }
 

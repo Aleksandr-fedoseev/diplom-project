@@ -89,6 +89,16 @@ func TestEventsProduceEmails(t *testing.T) {
 			payload: `{"orderId":15,"userId":7,"totalKopecks":450000}`,
 			subject: "Заказ №15 оформлен",
 			body:    []string{"Здравствуйте, Анна!", "Ваш заказ №15 оформлен.", "Итого: 4500.00 ₽", "после оплаты"},
+			absent:  []string{"Адрес доставки", " шт. × "},
+		},
+		{
+			event: notification.EventOrderPlaced,
+			payload: `{"orderId":16,"userId":7,"totalKopecks":285000,"deliveryAddress":"Астрахань, ул. Советская, 1",` +
+				`"items":[{"title":"Блокнот «Карта региона»","quantity":1,"priceKopecks":90000},` +
+				`{"title":"Книга","quantity":1,"priceKopecks":195000}]}`,
+			subject: "Заказ №16 оформлен",
+			body: []string{"Ваш заказ №16 оформлен.\n\nБлокнот «Карта региона» — 1 шт. × 900.00 ₽\nКнига — 1 шт. × 1950.00 ₽\n\n" +
+				"Итого: 2850.00 ₽\nАдрес доставки: Астрахань, ул. Советская, 1\n\nЗаказ будет передан в доставку после оплаты.\n"},
 		},
 		{
 			event:   notification.EventOrderPaid,
