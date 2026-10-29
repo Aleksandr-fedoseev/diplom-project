@@ -11,7 +11,7 @@ import (
 
 const createUser = `-- name: CreateUser :one
 
-INSERT INTO users (email, password_hash, name, role)
+INSERT INTO auth.users (email, password_hash, name, role)
 VALUES ($1, $2, $3, $4)
 RETURNING id, email, password_hash, name, role, is_blocked, created_at
 `
@@ -45,7 +45,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, name, role, is_blocked, created_at FROM users WHERE email = $1
+SELECT id, email, password_hash, name, role, is_blocked, created_at FROM auth.users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -64,7 +64,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, name, role, is_blocked, created_at FROM users WHERE id = $1
+SELECT id, email, password_hash, name, role, is_blocked, created_at FROM auth.users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
@@ -83,7 +83,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, password_hash, name, role, is_blocked, created_at FROM users ORDER BY id LIMIT $1 OFFSET $2
+SELECT id, email, password_hash, name, role, is_blocked, created_at FROM auth.users ORDER BY id LIMIT $1 OFFSET $2
 `
 
 type ListUsersParams struct {
@@ -120,7 +120,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 }
 
 const setUserBlocked = `-- name: SetUserBlocked :one
-UPDATE users SET is_blocked = $2 WHERE id = $1 RETURNING id, email, password_hash, name, role, is_blocked, created_at
+UPDATE auth.users SET is_blocked = $2 WHERE id = $1 RETURNING id, email, password_hash, name, role, is_blocked, created_at
 `
 
 type SetUserBlockedParams struct {
@@ -144,7 +144,7 @@ func (q *Queries) SetUserBlocked(ctx context.Context, arg SetUserBlockedParams) 
 }
 
 const setUserRole = `-- name: SetUserRole :one
-UPDATE users SET role = $2 WHERE id = $1 RETURNING id, email, password_hash, name, role, is_blocked, created_at
+UPDATE auth.users SET role = $2 WHERE id = $1 RETURNING id, email, password_hash, name, role, is_blocked, created_at
 `
 
 type SetUserRoleParams struct {

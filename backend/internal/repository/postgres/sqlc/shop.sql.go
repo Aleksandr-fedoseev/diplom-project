@@ -10,7 +10,7 @@ import (
 )
 
 const changeOrderStatus = `-- name: ChangeOrderStatus :execrows
-UPDATE orders SET status = $1, updated_at = now()
+UPDATE shop.orders SET status = $1, updated_at = now()
 WHERE id = $2 AND status = $3
 `
 
@@ -32,7 +32,7 @@ func (q *Queries) ChangeOrderStatus(ctx context.Context, arg ChangeOrderStatusPa
 }
 
 const clearCart = `-- name: ClearCart :exec
-DELETE FROM cart_items WHERE user_id = $1
+DELETE FROM shop.cart_items WHERE user_id = $1
 `
 
 func (q *Queries) ClearCart(ctx context.Context, userID int64) error {
@@ -41,7 +41,7 @@ func (q *Queries) ClearCart(ctx context.Context, userID int64) error {
 }
 
 const createOrder = `-- name: CreateOrder :one
-INSERT INTO orders (user_id, total_kopecks, delivery_address, phone)
+INSERT INTO shop.orders (user_id, total_kopecks, delivery_address, phone)
 VALUES ($1, $2, $3, $4)
 RETURNING id
 `
@@ -66,7 +66,7 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (int64
 }
 
 const createOrderItem = `-- name: CreateOrderItem :exec
-INSERT INTO order_items (order_id, product_id, title, quantity, price_kopecks)
+INSERT INTO shop.order_items (order_id, product_id, title, quantity, price_kopecks)
 VALUES ($1, $2, $3, $4, $5)
 `
 
@@ -90,7 +90,7 @@ func (q *Queries) CreateOrderItem(ctx context.Context, arg CreateOrderItemParams
 }
 
 const createProduct = `-- name: CreateProduct :one
-INSERT INTO products (slug, title, description, category, price_kopecks, stock, image_url, is_active)
+INSERT INTO shop.products (slug, title, description, category, price_kopecks, stock, image_url, is_active)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id, slug, title, description, category, price_kopecks, stock, image_url, is_active, created_at, updated_at
 `
@@ -135,7 +135,7 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 }
 
 const deactivateProduct = `-- name: DeactivateProduct :execrows
-UPDATE products SET is_active = FALSE, updated_at = now() WHERE id = $1
+UPDATE shop.products SET is_active = FALSE, updated_at = now() WHERE id = $1
 `
 
 // Товар не удаляется физически: на него ссылаются позиции старых заказов.
@@ -148,7 +148,7 @@ func (q *Queries) DeactivateProduct(ctx context.Context, id int64) (int64, error
 }
 
 const decrementProductStock = `-- name: DecrementProductStock :exec
-UPDATE products SET stock = stock - $1::int, updated_at = now() WHERE id = $2
+UPDATE shop.products SET stock = stock - $1::int, updated_at = now() WHERE id = $2
 `
 
 type DecrementProductStockParams struct {
@@ -162,7 +162,7 @@ func (q *Queries) DecrementProductStock(ctx context.Context, arg DecrementProduc
 }
 
 const deleteCartItem = `-- name: DeleteCartItem :exec
-DELETE FROM cart_items WHERE user_id = $1 AND product_id = $2
+DELETE FROM shop.cart_items WHERE user_id = $1 AND product_id = $2
 `
 
 type DeleteCartItemParams struct {
@@ -176,7 +176,7 @@ func (q *Queries) DeleteCartItem(ctx context.Context, arg DeleteCartItemParams) 
 }
 
 const deleteCartItemsByProduct = `-- name: DeleteCartItemsByProduct :exec
-DELETE FROM cart_items WHERE product_id = $1
+DELETE FROM shop.cart_items WHERE product_id = $1
 `
 
 // Снятый с продажи товар убираем из всех корзин.
@@ -186,7 +186,7 @@ func (q *Queries) DeleteCartItemsByProduct(ctx context.Context, productID int64)
 }
 
 const getOrder = `-- name: GetOrder :one
-SELECT id, user_id, total_kopecks, status, payment_id, payment_url, delivery_address, phone, created_at, updated_at FROM orders WHERE id = $1
+SELECT id, user_id, total_kopecks, status, payment_id, payment_url, delivery_address, phone, created_at, updated_at FROM shop.orders WHERE id = $1
 `
 
 func (q *Queries) GetOrder(ctx context.Context, id int64) (Order, error) {
@@ -208,7 +208,7 @@ func (q *Queries) GetOrder(ctx context.Context, id int64) (Order, error) {
 }
 
 const getOrderByPaymentID = `-- name: GetOrderByPaymentID :one
-SELECT id, user_id, total_kopecks, status, payment_id, payment_url, delivery_address, phone, created_at, updated_at FROM orders WHERE payment_id = $1
+SELECT id, user_id, total_kopecks, status, payment_id, payment_url, delivery_address, phone, created_at, updated_at FROM shop.orders WHERE payment_id = $1
 `
 
 func (q *Queries) GetOrderByPaymentID(ctx context.Context, paymentID *string) (Order, error) {
@@ -230,7 +230,7 @@ func (q *Queries) GetOrderByPaymentID(ctx context.Context, paymentID *string) (O
 }
 
 const getProductByID = `-- name: GetProductByID :one
-SELECT id, slug, title, description, category, price_kopecks, stock, image_url, is_active, created_at, updated_at FROM products WHERE id = $1
+SELECT id, slug, title, description, category, price_kopecks, stock, image_url, is_active, created_at, updated_at FROM shop.products WHERE id = $1
 `
 
 func (q *Queries) GetProductByID(ctx context.Context, id int64) (Product, error) {
@@ -253,7 +253,7 @@ func (q *Queries) GetProductByID(ctx context.Context, id int64) (Product, error)
 }
 
 const getProductBySlug = `-- name: GetProductBySlug :one
-SELECT id, slug, title, description, category, price_kopecks, stock, image_url, is_active, created_at, updated_at FROM products WHERE slug = $1
+SELECT id, slug, title, description, category, price_kopecks, stock, image_url, is_active, created_at, updated_at FROM shop.products WHERE slug = $1
 `
 
 func (q *Queries) GetProductBySlug(ctx context.Context, slug string) (Product, error) {
@@ -277,8 +277,8 @@ func (q *Queries) GetProductBySlug(ctx context.Context, slug string) (Product, e
 
 const listCartItems = `-- name: ListCartItems :many
 SELECT c.product_id, c.quantity, p.slug, p.title, p.price_kopecks, p.stock, p.image_url, p.is_active
-FROM cart_items c
-JOIN products p ON p.id = c.product_id
+FROM shop.cart_items c
+JOIN shop.products p ON p.id = c.product_id
 WHERE c.user_id = $1
 ORDER BY c.added_at, c.product_id
 `
@@ -325,7 +325,7 @@ func (q *Queries) ListCartItems(ctx context.Context, userID int64) ([]ListCartIt
 
 const listOrderItems = `-- name: ListOrderItems :many
 SELECT order_id, product_id, title, quantity, price_kopecks
-FROM order_items
+FROM shop.order_items
 WHERE order_id = ANY($1::bigint[])
 ORDER BY order_id, title
 `
@@ -357,7 +357,7 @@ func (q *Queries) ListOrderItems(ctx context.Context, orderIds []int64) ([]Order
 }
 
 const listOrders = `-- name: ListOrders :many
-SELECT id, user_id, total_kopecks, status, payment_id, payment_url, delivery_address, phone, created_at, updated_at FROM orders
+SELECT id, user_id, total_kopecks, status, payment_id, payment_url, delivery_address, phone, created_at, updated_at FROM shop.orders
 WHERE $3::text IS NULL OR status = $3::text
 ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2
@@ -401,7 +401,7 @@ func (q *Queries) ListOrders(ctx context.Context, arg ListOrdersParams) ([]Order
 }
 
 const listOrdersByUser = `-- name: ListOrdersByUser :many
-SELECT id, user_id, total_kopecks, status, payment_id, payment_url, delivery_address, phone, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC, id DESC
+SELECT id, user_id, total_kopecks, status, payment_id, payment_url, delivery_address, phone, created_at, updated_at FROM shop.orders WHERE user_id = $1 ORDER BY created_at DESC, id DESC
 `
 
 func (q *Queries) ListOrdersByUser(ctx context.Context, userID *int64) ([]Order, error) {
@@ -437,7 +437,7 @@ func (q *Queries) ListOrdersByUser(ctx context.Context, userID *int64) ([]Order,
 
 const listProducts = `-- name: ListProducts :many
 
-SELECT id, slug, title, description, category, price_kopecks, stock, image_url, is_active, created_at, updated_at FROM products
+SELECT id, slug, title, description, category, price_kopecks, stock, image_url, is_active, created_at, updated_at FROM shop.products
 WHERE (is_active OR $1::boolean)
   AND ($2::text IS NULL OR category = $2::text)
 ORDER BY id
@@ -484,8 +484,8 @@ func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]P
 
 const lockCartProducts = `-- name: LockCartProducts :many
 SELECT c.product_id, c.quantity, p.title, p.price_kopecks, p.stock, p.is_active
-FROM cart_items c
-JOIN products p ON p.id = c.product_id
+FROM shop.cart_items c
+JOIN shop.products p ON p.id = c.product_id
 WHERE c.user_id = $1
 ORDER BY p.id
 FOR UPDATE OF p
@@ -531,9 +531,9 @@ func (q *Queries) LockCartProducts(ctx context.Context, userID int64) ([]LockCar
 }
 
 const returnProductStockForOrder = `-- name: ReturnProductStockForOrder :exec
-UPDATE products p
+UPDATE shop.products p
 SET stock = p.stock + oi.quantity, updated_at = now()
-FROM order_items oi
+FROM shop.order_items oi
 WHERE oi.order_id = $1 AND p.id = oi.product_id
 `
 
@@ -544,7 +544,7 @@ func (q *Queries) ReturnProductStockForOrder(ctx context.Context, orderID int64)
 }
 
 const setOrderPayment = `-- name: SetOrderPayment :exec
-UPDATE orders SET payment_id = $2, payment_url = $3, updated_at = now() WHERE id = $1
+UPDATE shop.orders SET payment_id = $2, payment_url = $3, updated_at = now() WHERE id = $1
 `
 
 type SetOrderPaymentParams struct {
@@ -559,7 +559,7 @@ func (q *Queries) SetOrderPayment(ctx context.Context, arg SetOrderPaymentParams
 }
 
 const updateProduct = `-- name: UpdateProduct :one
-UPDATE products
+UPDATE shop.products
 SET slug = $2, title = $3, description = $4, category = $5, price_kopecks = $6,
     stock = $7, image_url = $8, is_active = $9, updated_at = now()
 WHERE id = $1
@@ -608,7 +608,7 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (P
 }
 
 const upsertCartItem = `-- name: UpsertCartItem :exec
-INSERT INTO cart_items (user_id, product_id, quantity)
+INSERT INTO shop.cart_items (user_id, product_id, quantity)
 VALUES ($1, $2, $3)
 ON CONFLICT (user_id, product_id) DO UPDATE SET quantity = EXCLUDED.quantity
 `

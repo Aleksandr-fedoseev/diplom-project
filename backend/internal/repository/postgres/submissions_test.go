@@ -25,7 +25,7 @@ func TestSubmissionsRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 	var birzhaID int64
-	if err := pool.QueryRow(ctx, `SELECT id FROM heritage_objects WHERE slug = 'birzha'`).Scan(&birzhaID); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT id FROM catalog.heritage_objects WHERE slug = 'birzha'`).Scan(&birzhaID); err != nil {
 		t.Fatal(err)
 	}
 

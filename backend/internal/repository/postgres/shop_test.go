@@ -90,7 +90,7 @@ func TestShopRepositories(t *testing.T) {
 			t.Fatalf("строки оформления не в порядке id: %+v", lines)
 		}
 		// Другое соединение не может взять блокировку той же строки.
-		if _, err := pool.Exec(context.Background(), `SELECT 1 FROM products WHERE id = $1 FOR UPDATE NOWAIT`, a.ID); err == nil {
+		if _, err := pool.Exec(context.Background(), `SELECT 1 FROM shop.products WHERE id = $1 FOR UPDATE NOWAIT`, a.ID); err == nil {
 			t.Fatal("строка товара должна быть заблокирована до конца транзакции")
 		}
 		o, err := shop.NewOrder(u.ID, shop.CheckoutInput{DeliveryAddress: "адрес", Phone: "+79001234567"}, lines)
@@ -110,7 +110,7 @@ func TestShopRepositories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `SELECT 1 FROM products WHERE id = $1 FOR UPDATE NOWAIT`, a.ID); err != nil {
+	if _, err := pool.Exec(ctx, `SELECT 1 FROM shop.products WHERE id = $1 FOR UPDATE NOWAIT`, a.ID); err != nil {
 		t.Fatalf("после фиксации блокировка должна сняться: %v", err)
 	}
 	if stock(a.ID) != 3 || stock(b.ID) != 7 {

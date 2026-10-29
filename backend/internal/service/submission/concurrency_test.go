@@ -30,7 +30,7 @@ func TestApproveConcurrently(t *testing.T) {
 	author, mod := newUser("race-author", auth.RoleUser), newUser("race-mod", auth.RoleModerator)
 
 	var birzhaID int64
-	if err := pool.QueryRow(ctx, `SELECT id FROM heritage_objects WHERE slug = 'birzha'`).Scan(&birzhaID); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT id FROM catalog.heritage_objects WHERE slug = 'birzha'`).Scan(&birzhaID); err != nil {
 		t.Fatal(err)
 	}
 	catalog := &fakeCatalog{objects: map[string]ObjectRef{"birzha": {ID: birzhaID, Slug: "birzha", Title: "Биржа", Published: true}}}

@@ -10,14 +10,14 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
-	"heritage-backend/internal/catalog"
-	"heritage-backend/internal/media"
-	"heritage-backend/internal/routes"
-	"heritage-backend/internal/shop"
-	"heritage-backend/internal/submissions"
 	authhttp "heritage-backend/internal/transport/http/auth"
+	cataloghttp "heritage-backend/internal/transport/http/catalog"
 	"heritage-backend/internal/transport/http/httpx"
+	mediahttp "heritage-backend/internal/transport/http/media"
 	"heritage-backend/internal/transport/http/middleware"
+	routehttp "heritage-backend/internal/transport/http/route"
+	shophttp "heritage-backend/internal/transport/http/shop"
+	submissionhttp "heritage-backend/internal/transport/http/submission"
 )
 
 type Deps struct {
@@ -26,14 +26,12 @@ type Deps struct {
 	// Health проверяет, что приложение может работать (БД доступна).
 	Health func(ctx context.Context) error
 
-	Auth *authhttp.Handler
-
-	// Модули, которые ещё не переехали на новую раскладку.
-	Catalog     *catalog.Handler
-	Media       *media.Handler
-	Routes      *routes.Handler
-	Submissions *submissions.Handler
-	Shop        *shop.Handler
+	Auth       *authhttp.Handler
+	Catalog    *cataloghttp.Handler
+	Media      *mediahttp.Handler
+	Route      *routehttp.Handler
+	Submission *submissionhttp.Handler
+	Shop       *shophttp.Handler
 }
 
 func New(d Deps) http.Handler {
@@ -66,8 +64,8 @@ func New(d Deps) http.Handler {
 
 		r.Route("/media", d.Media.Routes)
 		d.Catalog.Routes(r)
-		d.Routes.Routes(r)
-		d.Submissions.Routes(r)
+		d.Route.Routes(r)
+		d.Submission.Routes(r)
 		d.Shop.Routes(r)
 	})
 	return r

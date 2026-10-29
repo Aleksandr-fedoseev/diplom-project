@@ -168,14 +168,14 @@ func TestObjectsDeleteInRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	var routeID int64
-	err = pool.QueryRow(ctx, `INSERT INTO routes (slug, title, distance_m, duration_s, geometry)
+	err = pool.QueryRow(ctx, `INSERT INTO route.routes (slug, title, distance_m, duration_s, geometry)
 		VALUES ($1, 'Тест', 1, 1, 'SRID=4326;LINESTRING(48.03 46.35, 48.04 46.36)') RETURNING id`,
 		testdb.Unique("route")).Scan(&routeID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM routes WHERE id = $1`, routeID) })
-	if _, err := pool.Exec(ctx, `INSERT INTO route_points (route_id, position, object_id) VALUES ($1, 0, $2)`, routeID, o.ID); err != nil {
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `DELETE FROM route.routes WHERE id = $1`, routeID) })
+	if _, err := pool.Exec(ctx, `INSERT INTO route.route_points (route_id, position, object_id) VALUES ($1, 0, $2)`, routeID, o.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := objects.Delete(ctx, o.ID); !errors.Is(err, catalog.ErrObjectInRoute) {

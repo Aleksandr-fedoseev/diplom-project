@@ -4,64 +4,94 @@ import (
 	"context"
 	"net/http"
 
-	legacyauth "heritage-backend/internal/auth"
-	"heritage-backend/internal/catalog"
+	"heritage-backend/internal/infrastructure/osrm"
+	"heritage-backend/internal/infrastructure/outbox"
+	"heritage-backend/internal/infrastructure/postgres"
+	"heritage-backend/internal/infrastructure/s3"
 	"heritage-backend/internal/infrastructure/security"
-	"heritage-backend/internal/media"
-	"heritage-backend/internal/notifications"
-	"heritage-backend/internal/osrm"
+	"heritage-backend/internal/infrastructure/smtp"
+	"heritage-backend/internal/infrastructure/yookassa"
 	repo "heritage-backend/internal/repository/postgres"
-	"heritage-backend/internal/routes"
 	authsvc "heritage-backend/internal/service/auth"
-	"heritage-backend/internal/shop"
-	"heritage-backend/internal/submissions"
+	catalogsvc "heritage-backend/internal/service/catalog"
+	mediasvc "heritage-backend/internal/service/media"
+	notificationsvc "heritage-backend/internal/service/notification"
+	routesvc "heritage-backend/internal/service/route"
+	shopsvc "heritage-backend/internal/service/shop"
+	submissionsvc "heritage-backend/internal/service/submission"
 	httptransport "heritage-backend/internal/transport/http"
 	authhttp "heritage-backend/internal/transport/http/auth"
+	cataloghttp "heritage-backend/internal/transport/http/catalog"
+	mediahttp "heritage-backend/internal/transport/http/media"
+	routehttp "heritage-backend/internal/transport/http/route"
+	shophttp "heritage-backend/internal/transport/http/shop"
+	submissionhttp "heritage-backend/internal/transport/http/submission"
 )
 
-// wire создаёт модули и связывает их между собой. Возвращает корневой HTTP-обработчик;
-// фоновые задачи добавляет в a.workers.
+// wire создаёт модули и связывает их между собой: репозитории → сервисы → обработчики.
+// Возвращает корневой HTTP-обработчик; фоновые задачи добавляет в a.workers.
 func (a *App) wire(ctx context.Context) (http.Handler, error) {
 	cfg, db := a.cfg, a.pool
+	tx := postgres.NewTxManager(db)
+	events := outbox.NewPublisher(db) // события пишутся в транзакции сервиса
 
-	// Пользователи: репозиторий → сервис (bcrypt и JWT подставляются через порты) → обработчик.
+	// Пользователи: bcrypt и JWT подставляются через порты сервиса.
 	authService := authsvc.NewService(repo.NewUsers(db), security.BcryptHasher{},
 		security.NewJWTIssuer(cfg.JWTSecret, cfg.JWTTTL))
 	if err := authService.EnsureAdmin(ctx, cfg.AdminEmail, cfg.AdminPassword); err != nil {
 		return nil, err
 	}
-	// Старый сервис пользователей нужен submissions и shop, пока они не переехали.
-	legacyAuth := legacyauth.NewService(db)
 
-	// Письма уходят через SMTP, а без него (при разработке) — только в лог.
-	var sender notifications.Sender = notifications.LogSender{}
-	if cfg.SMTPHost != "" {
-		sender = notifications.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
-	}
-	notifySvc := notifications.NewService(db, sender)
-	a.workers = append(a.workers, notifySvc.Run)
+	// Каталог — владелец объектов; остальные модули получают сведения об объектах через него.
+	catalogService := catalogsvc.NewService(repo.NewObjects(db), repo.NewCategories(db))
 
-	// Каталог — владелец объектов; медиафайлы и маршруты получают сведения об объектах через него.
-	catalogSvc := catalog.NewService(db)
-
-	mediaSvc, err := media.NewService(ctx, db, catalogSvc, cfg.MinIOEndpoint, cfg.MinIOAccessKey, cfg.MinIOSecretKey,
-		cfg.MinIOBucket, cfg.MinIOUseSSL, cfg.MaxUploadMB)
+	storage, err := s3.New(ctx, cfg.MinIOEndpoint, cfg.MinIOAccessKey, cfg.MinIOSecretKey, cfg.MinIOBucket, cfg.MinIOUseSSL)
 	if err != nil {
 		return nil, err
 	}
-	mediaHandler := media.NewHandler(mediaSvc)
+	mediaService := mediasvc.NewService(repo.NewMedia(db), storage, catalogService, cfg.MaxUploadMB)
+	mediaHandler := mediahttp.NewHandler(mediaService)
+
+	routeService := routesvc.NewService(repo.NewRoutes(db), routePlaces{catalogService},
+		routeRouter{osrm.NewClient(cfg.OSRMURL)}, tx)
+
+	submissionService := submissionsvc.NewService(repo.NewSubmissions(db), tx, events,
+		submissionCatalog{catalogService}, submissionMedia{mediaService}, submissionUsers{authService})
+
+	// Без YOOKASSA_SHOP_ID клиент не обращается к ЮKassa: заказ создаётся без ссылки на оплату.
+	shopService := shopsvc.NewService(shopsvc.Deps{
+		Tx:        tx,
+		Products:  repo.NewProducts(db),
+		Carts:     repo.NewCarts(db),
+		Orders:    repo.NewOrders(db),
+		Users:     authService,
+		Events:    events,
+		Payments:  shopPayments{yookassa.NewClient(cfg.YooKassaShopID, cfg.YooKassaSecretKey)},
+		ReturnURL: cfg.YooKassaReturnURL,
+	})
+
+	// Уведомления: обработчик outbox доставляет события модулю notification,
+	// тот превращает их в письма. Без SMTP_HOST письма только пишутся в лог.
+	var mailer notificationsvc.Mailer = smtp.LogMailer{}
+	if cfg.SMTPHost != "" {
+		mailer = smtp.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
+	}
+	notificationService := notificationsvc.NewService(notificationUsers{authService}, mailer, cfg.PublicURL)
+	processor := outbox.NewProcessor(db)
+	for eventType, handle := range notificationService.Handlers() {
+		processor.Subscribe(eventType, handle)
+	}
+	a.workers = append(a.workers, processor.Run)
 
 	return httptransport.New(httptransport.Deps{
 		CORSOrigins:   cfg.CORSOrigins,
 		Authenticator: authService,
 		Health:        db.Ping,
 		Auth:          authhttp.NewHandler(authService),
-		Catalog:       catalog.NewHandler(catalogSvc, mediaSvc, mediaHandler),
+		Catalog:       cataloghttp.NewHandler(catalogService, mediaService, mediaHandler),
 		Media:         mediaHandler,
-		Routes:        routes.NewHandler(routes.NewService(db, catalogSvc, osrm.NewClient(cfg.OSRMURL))),
-		Submissions:   submissions.NewHandler(submissions.NewService(db, catalogSvc, mediaSvc, legacyAuth, notifySvc, cfg.PublicURL)),
-		// Без YOOKASSA_SHOP_ID клиент не обращается к ЮKassa: заказ создаётся без ссылки на оплату.
-		Shop: shop.NewHandler(shop.NewService(db, legacyAuth, notifySvc,
-			shop.NewYooKassaClient(cfg.YooKassaShopID, cfg.YooKassaSecretKey), cfg.YooKassaReturnURL)),
+		Route:         routehttp.NewHandler(routeService),
+		Submission:    submissionhttp.NewHandler(submissionService, cfg.MaxUploadMB<<20),
+		Shop:          shophttp.NewHandler(shopService),
 	}), nil
 }

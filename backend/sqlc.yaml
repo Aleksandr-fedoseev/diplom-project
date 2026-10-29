@@ -1,79 +1,29 @@
-# Настройки генерации кода доступа к БД.
-# SQL-запросы лежат в файле queries.sql каждого модуля, схема берётся из миграций.
-# Каждый модуль получает свой пакет store только со своими запросами.
+# Настройки генерации кода доступа к БД (sqlc).
+# Схема берётся из миграций, запросы — из internal/repository/postgres/queries/<модуль>.sql,
+# весь код генерируется в один пакет internal/repository/postgres/sqlc.
 # После изменения запросов или миграций: go tool sqlc generate
 version: "2"
 
 sql:
   - engine: postgresql
     schema: migrations
-    queries: internal/auth/queries.sql
+    queries: internal/repository/postgres/queries
     gen:
-      go: &go
-        package: store
-        out: internal/auth/store
+      go:
+        package: sqlc
+        out: internal/repository/postgres/sqlc
         sql_package: pgx/v5
-        omit_unused_structs: true # в пакет модуля попадают только его таблицы
+        omit_unused_structs: true
         emit_pointers_for_null_types: true # NULL в БД — nil в Go
         overrides:
           - db_type: timestamptz
             go_type: time.Time
-
-  - engine: postgresql
-    schema: migrations
-    queries: internal/catalog/queries.sql
-    gen:
-      go:
-        <<: *go
-        out: internal/catalog/store
-
-  - engine: postgresql
-    schema: migrations
-    queries: internal/media/queries.sql
-    gen:
-      go:
-        <<: *go
-        out: internal/media/store
-
-  - engine: postgresql
-    schema: migrations
-    queries: internal/routes/queries.sql
-    gen:
-      go:
-        <<: *go
-        out: internal/routes/store
-
-  - engine: postgresql
-    schema: migrations
-    queries: internal/notifications/queries.sql
-    gen:
-      go:
-        <<: *go
-        out: internal/notifications/store
-
-  - engine: postgresql
-    schema: migrations
-    queries: internal/submissions/queries.sql
-    gen:
-      go:
-        <<: *go
-        out: internal/submissions/store
-
-  - engine: postgresql
-    schema: migrations
-    queries: internal/shop/queries.sql
-    gen:
-      go:
-        <<: *go
-        out: internal/shop/store
-
-  # Новая раскладка: все репозитории в repository/postgres, один пакет sqlc,
-  # запросы разложены по файлам модулей в queries/.
-  - engine: postgresql
-    schema: migrations
-    queries: internal/repository/postgres/queries
-    gen:
-      go:
-        <<: *go
-        package: sqlc
-        out: internal/repository/postgres/sqlc
+        # Таблицы лежат в схемах модулей, и sqlc добавляет имя схемы к именам моделей
+        # (AuthUser, MediaMediaFile). Возвращаем короткие имена.
+        rename:
+          auth_user: User
+          catalog_category: Category
+          media_media_file: MediaFile
+          shop_order: Order
+          shop_order_item: OrderItem
+          shop_product: Product
