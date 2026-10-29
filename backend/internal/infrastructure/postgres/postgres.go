@@ -1,10 +1,10 @@
-// Package database открывает пул соединений с PostgreSQL и применяет миграции.
-package database
+// Package postgres — техника работы с PostgreSQL: пул соединений, миграции и транзакции.
+// О домене пакет ничего не знает; репозитории берут соединение через Conn.
+package postgres
 
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"fmt"
 	"log/slog"
 	"time"
@@ -12,12 +12,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
-)
 
-// Файлы миграций вшиваются в бинарник, поэтому их не нужно копировать на сервер отдельно.
-//
-//go:embed migrations/*.sql
-var migrations embed.FS
+	"heritage-backend/migrations"
+)
 
 // Connect пробует подключиться в течение 30 секунд: при старте в Docker
 // PostgreSQL может быть ещё не готов, хотя контейнер уже запущен.
@@ -53,9 +50,9 @@ func Migrate(pool *pgxpool.Pool) error {
 	db := stdlib.OpenDBFromPool(pool)
 	defer func(db *sql.DB) { _ = db.Close() }(db)
 
-	goose.SetBaseFS(migrations)
+	goose.SetBaseFS(migrations.FS)
 	if err := goose.SetDialect("postgres"); err != nil {
 		return err
 	}
-	return goose.Up(db, "migrations")
+	return goose.Up(db, ".")
 }

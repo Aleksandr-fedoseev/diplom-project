@@ -6,7 +6,7 @@ version: "2"
 
 sql:
   - engine: postgresql
-    schema: internal/database/migrations
+    schema: migrations
     queries: internal/auth/queries.sql
     gen:
       go: &go
@@ -20,7 +20,7 @@ sql:
             go_type: time.Time
 
   - engine: postgresql
-    schema: internal/database/migrations
+    schema: migrations
     queries: internal/catalog/queries.sql
     gen:
       go:
@@ -28,7 +28,7 @@ sql:
         out: internal/catalog/store
 
   - engine: postgresql
-    schema: internal/database/migrations
+    schema: migrations
     queries: internal/media/queries.sql
     gen:
       go:
@@ -36,7 +36,7 @@ sql:
         out: internal/media/store
 
   - engine: postgresql
-    schema: internal/database/migrations
+    schema: migrations
     queries: internal/routes/queries.sql
     gen:
       go:
@@ -44,7 +44,7 @@ sql:
         out: internal/routes/store
 
   - engine: postgresql
-    schema: internal/database/migrations
+    schema: migrations
     queries: internal/notifications/queries.sql
     gen:
       go:
@@ -52,7 +52,7 @@ sql:
         out: internal/notifications/store
 
   - engine: postgresql
-    schema: internal/database/migrations
+    schema: migrations
     queries: internal/submissions/queries.sql
     gen:
       go:
@@ -60,7 +60,7 @@ sql:
         out: internal/submissions/store
 
   - engine: postgresql
-    schema: internal/database/migrations
+    schema: migrations
     queries: internal/shop/queries.sql
     gen:
       go:

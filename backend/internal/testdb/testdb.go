@@ -10,7 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"heritage-backend/internal/database"
+	"heritage-backend/internal/infrastructure/postgres"
 )
 
 // Connect открывает пул и применяет миграции, так что тест видит актуальную схему и стартовые данные.
@@ -20,12 +20,12 @@ func Connect(t *testing.T) *pgxpool.Pool {
 	if url == "" {
 		t.Skip("TEST_DATABASE_URL не задан")
 	}
-	db, err := database.Connect(context.Background(), url)
+	db, err := postgres.Connect(context.Background(), url)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(db.Close)
-	if err := database.Migrate(db); err != nil {
+	if err := postgres.Migrate(db); err != nil {
 		t.Fatal(err)
 	}
 	return db
