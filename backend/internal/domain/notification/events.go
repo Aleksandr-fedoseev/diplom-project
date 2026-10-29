@@ -35,10 +35,20 @@ type SubmissionRejected struct {
 }
 
 // OrderPlaced — покупатель оформил заказ. UserID = 0 — покупатель удалён.
+// DeliveryAddress и Items необязательны: без них письмо просто короче.
 type OrderPlaced struct {
-	OrderID      int64 `json:"orderId"`
-	UserID       int64 `json:"userId"`
-	TotalKopecks int64 `json:"totalKopecks"`
+	OrderID         int64       `json:"orderId"`
+	UserID          int64       `json:"userId"`
+	TotalKopecks    int64       `json:"totalKopecks"`
+	DeliveryAddress string      `json:"deliveryAddress,omitempty"`
+	Items           []OrderItem `json:"items,omitempty"`
+}
+
+// OrderItem — строка заказа: товар, количество и цена за штуку на момент заказа.
+type OrderItem struct {
+	Title        string `json:"title"`
+	Quantity     int64  `json:"quantity"`
+	PriceKopecks int64  `json:"priceKopecks"`
 }
 
 // OrderPaid — оплата заказа получена.
