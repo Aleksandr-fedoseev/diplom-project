@@ -8,7 +8,7 @@ import {
   MapPin, 
   Users, 
   Calendar, 
-  Volume2, 
+  Map as MapIcon, 
   ArrowRight, 
   CheckCircle2, 
   Phone, 
@@ -43,7 +43,7 @@ export default function ToursPage() {
           Экскурсии и маршруты
         </h1>
         <p className="text-base sm:text-lg text-slate-600 mt-2 max-w-2xl">
-          Пешеходные прогулки с историками Центра и бесплатные онлайн-маршруты с аудиогидом для самостоятельного изучения Астрахани.
+          Пешеходные прогулки с историками Центра и бесплатные онлайн-маршруты по карте для самостоятельного изучения Астрахани.
         </p>
       </div>
 
@@ -64,7 +64,7 @@ export default function ToursPage() {
               />
               <div className="absolute top-4 left-4 flex gap-2">
                 <span className="px-3 py-1 bg-slate-950/85 backdrop-blur-md text-white text-xs font-bold uppercase tracking-wider rounded-lg">
-                  {tour.isOnlineRoute ? 'Онлайн-аудиогид' : 'Пешеходная группа'}
+                  {tour.isOnlineRoute ? 'Онлайн-маршрут' : 'Пешеходная группа'}
                 </span>
               </div>
             </div>
@@ -141,8 +141,8 @@ export default function ToursPage() {
                     href="/map"
                     className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-sm"
                   >
-                    <Volume2 className="w-4 h-4" />
-                    <span>Слушать онлайн на карте</span>
+                    <MapIcon className="w-4 h-4" />
+                    <span>Открыть маршрут на карте</span>
                   </Link>
                 ) : (
                   <a

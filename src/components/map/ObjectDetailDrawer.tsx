@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { 
   X, 
   Eye, 
-  Volume2, 
   MapPin, 
   Calendar, 
   ShieldCheck,
@@ -24,8 +23,7 @@ interface ObjectDetailDrawerProps {
 }
 
 export default function ObjectDetailDrawer({ object, onClose }: ObjectDetailDrawerProps) {
-  const [activeTab, setActiveTab] = useState<'info' | 'panorama' | 'audio'>('info');
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [activeTab, setActiveTab] = useState<'info' | 'panorama'>('info');
 
   if (!object) return null;
 
@@ -98,19 +96,6 @@ export default function ObjectDetailDrawer({ object, onClose }: ObjectDetailDraw
           </button>
         )}
 
-        {object.hasAudioGuide && (
-          <button
-            onClick={() => setActiveTab('audio')}
-            className={`py-3 px-3 border-b-2 flex items-center gap-1.5 transition-colors ${
-              activeTab === 'audio'
-                ? 'border-blue-600 text-blue-600 font-bold'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Volume2 className="w-3.5 h-3.5" />
-            <span>Аудиогид</span>
-          </button>
-        )}
       </div>
 
       {/* Scrollable Content */}
@@ -212,39 +197,6 @@ export default function ObjectDetailDrawer({ object, onClose }: ObjectDetailDraw
         {/* TAB 2: Panorama 360 Player */}
         {activeTab === 'panorama' && hasPanorama(object) && (
           <PanoramaViewer key={object.id} panoramas={object.panoramas ?? []} heightClassName="h-72 sm:h-80" />
-        )}
-
-        {/* TAB 3: Audio Guide */}
-        {activeTab === 'audio' && object.hasAudioGuide && (
-          <div className="space-y-4">
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">
-                    Аудиоэкскурсия к объекту
-                  </h4>
-                  <p className="text-xs text-slate-500">
-                    Длительность: {object.audioDuration}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setIsPlayingAudio(!isPlayingAudio)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                >
-                  <Volume2 className="w-4 h-4" />
-                  <span>{isPlayingAudio ? 'Пауза' : 'Слушать'}</span>
-                </button>
-              </div>
-
-              <div className="p-2.5 bg-white border border-slate-200 rounded text-center text-xs text-slate-500 font-mono">
-                [ 00:00 / {object.audioDuration} ]
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Запись подготовлена историками и краеведами АНО «Центр сохранения архитектуры».
-            </p>
-          </div>
         )}
 
       </div>

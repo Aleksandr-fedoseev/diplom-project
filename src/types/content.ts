@@ -61,7 +61,6 @@ export interface Tour {
   distance: string;
   price: number;
   isOnlineRoute: boolean;
-  hasAudio: boolean;
   guideName?: string;
   guideRole?: string;
   maxGroupSize?: number;

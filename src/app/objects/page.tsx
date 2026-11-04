@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Search, Filter, Eye, Volume2, ArrowRight, Building2, MapPin } from 'lucide-react';
+import { Search, Filter, Eye, ArrowRight, Building2, MapPin } from 'lucide-react';
 import { HERITAGE_OBJECTS, hasPanorama } from '@/data/heritage';
 
 export default function ObjectsPage() {

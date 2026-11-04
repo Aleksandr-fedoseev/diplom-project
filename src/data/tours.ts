@@ -11,7 +11,6 @@ export const TOURS: Tour[] = [
     distance: '1.8 км',
     price: 800,
     isOnlineRoute: false,
-    hasAudio: false,
     guideName: 'Сергей Марков',
     guideRole: 'Краевед, исследователь купеческой Астрахани',
     maxGroupSize: 15,
@@ -55,7 +54,6 @@ export const TOURS: Tour[] = [
     distance: '2.4 км',
     price: 900,
     isOnlineRoute: false,
-    hasAudio: false,
     guideName: 'Елена Васильева',
     guideRole: 'Архитектурный историк',
     maxGroupSize: 12,
@@ -92,14 +90,13 @@ export const TOURS: Tour[] = [
   {
     id: 'tour-online-bely-gorod',
     slug: 'onlayn-marshrut-bely-gorod-i-kreml',
-    title: 'Онлайн-маршрут: Белый город и Кремль (с аудиогидом)',
-    description: 'Бесплатный аудиогид для самостоятельной прогулки со смартфоном. Точные координаты остановок, оцифрованные архивные снимки и профессиональная озвучка.',
+    title: 'Онлайн-маршрут: Белый город и Кремль',
+    description: 'Бесплатный маршрут для самостоятельной прогулки со смартфоном: точные координаты остановок и оцифрованные архивные снимки.',
     coverImage: '/heritage/dom-s-butylkami/cover.jpg',
     duration: '1.5 часа',
     distance: '2.2 км',
     price: 0,
     isOnlineRoute: true,
-    hasAudio: true,
     stopsCount: 4,
     stops: [
       {

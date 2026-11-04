@@ -34,8 +34,6 @@ export interface HeritageObject {
   archiveImage?: string;
   archiveYear?: string;
   panoramas?: Panorama[];
-  hasAudioGuide: boolean;
-  audioDuration?: string;
   shortDescription: string;
   fullHistory: string;
   tags: string[];

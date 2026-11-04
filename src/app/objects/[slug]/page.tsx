@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { notFound, useParams } from 'next/navigation';
 import { 
   Eye, 
-  Volume2, 
   MapPin, 
   ShieldCheck, 
   Share2, 
@@ -21,8 +20,7 @@ export default function ObjectDetailPage() {
   const slug = params?.slug as string;
 
   const object = HERITAGE_OBJECTS.find((item) => item.slug === slug) || HERITAGE_OBJECTS[0];
-  const [activeTab, setActiveTab] = useState<'passport' | 'panorama' | 'audio'>('passport');
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [activeTab, setActiveTab] = useState<'passport' | 'panorama'>('passport');
 
   if (!object) {
     return notFound();
@@ -115,19 +113,6 @@ export default function ObjectDetailPage() {
             </button>
           )}
 
-          {object.hasAudioGuide && (
-            <button
-              onClick={() => setActiveTab('audio')}
-              className={`px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors flex items-center gap-2 ${
-                activeTab === 'audio'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Volume2 className="w-4 h-4" />
-              <span>Аудиогид ({object.audioDuration})</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -176,33 +161,6 @@ export default function ObjectDetailPage() {
           {/* TAB 2: 360° Panorama Viewer */}
           {activeTab === 'panorama' && hasPanorama(object) && (
             <PanoramaViewer key={object.id} panoramas={object.panoramas ?? []} />
-          )}
-
-          {/* TAB 3: Audio Guide */}
-          {activeTab === 'audio' && object.hasAudioGuide && (
-            <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900">
-                    Аудиоэкскурсия по объекту
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Длительность: {object.audioDuration} • АНО «Центр сохранения архитектуры»
-                  </p>
-                </div>
-                <button
-                  onClick={() => setIsPlayingAudio(!isPlayingAudio)}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors"
-                >
-                  <Volume2 className="w-4 h-4" />
-                  <span>{isPlayingAudio ? 'Пауза' : 'Слушать'}</span>
-                </button>
-              </div>
-
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
-                [ Аудиоплеер синхронизирован с ключевыми точками фасада ]
-              </div>
-            </div>
           )}
 
         </div>
