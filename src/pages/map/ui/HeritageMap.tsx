@@ -4,8 +4,8 @@ import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { HeritageObject } from '@/entities/heritage-object';
-import { hasPanorama } from '@/entities/heritage-object';
 import { ASTRAKHAN_BOUNDS } from '@/shared/config';
+import { markerHtml } from '../lib/marker';
 
 interface HeritageMapProps {
   objects: HeritageObject[];
@@ -22,7 +22,7 @@ export default function HeritageMap({
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
 
-  // 1. Initialize Leaflet Map locked strictly to Astrakhan Oblast
+  // 1. Карта, ограниченная Астраханской областью
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
@@ -38,15 +38,15 @@ export default function HeritageMap({
       maxBounds: astrakhanBounds,
       maxBoundsViscosity: 1.0, // Жесткое удержание камеры внутри Астраханской области
       zoomControl: false,
-      attributionControl: false, // Отключаем стандартный блок атрибуции Leaflet с флагом
     });
+    // Лицензия OpenStreetMap требует подписи об источнике данных.
+    map.attributionControl.setPrefix(false);
 
-    // Real OpenStreetMap Standard Tile Layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">участники OpenStreetMap</a>',
     }).addTo(map);
 
-    // Add controls in top right
     L.control.zoom({ position: 'topright' }).addTo(map);
     L.control.scale({ position: 'bottomright', imperial: false, metric: true }).addTo(map);
 
@@ -59,7 +59,7 @@ export default function HeritageMap({
     };
   }, []);
 
-  // 2. Render Markers for Astrakhan Monuments
+  // 2. Значки объектов
   useEffect(() => {
     const map = mapInstanceRef.current;
     const markersLayer = markersLayerRef.current;
@@ -68,21 +68,8 @@ export default function HeritageMap({
     markersLayer.clearLayers();
 
     objects.forEach((obj) => {
-      const isSelected = activeObject?.id === obj.id;
-      const isLost = obj.category === 'lost';
-
-      const iconHtml = `
-        <div class="custom-osm-pin ${isSelected ? 'is-active' : ''} ${isLost ? 'is-lost' : ''}">
-          <div class="pin-badge">
-            ${hasPanorama(obj) ? '<span class="vr-badge">360°</span>' : ''}
-            <span class="pin-symbol">${isLost ? '⚑' : '🏛'}</span>
-          </div>
-          <div class="pin-title">${obj.title}</div>
-        </div>
-      `;
-
       const customIcon = L.divIcon({
-        html: iconHtml,
+        html: markerHtml(obj, activeObject?.id === obj.id),
         className: 'astrakhan-marker-container',
         iconSize: [120, 48],
         iconAnchor: [60, 48],
@@ -103,7 +90,7 @@ export default function HeritageMap({
     });
   }, [objects, activeObject, onSelectObject]);
 
-  // 3. Pan to active object if changed from outside
+  // 3. Перелёт к объекту, выбранному в списке
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !activeObject) return;
@@ -189,10 +176,6 @@ export default function HeritageMap({
           background: #0F172A;
           color: #FFFFFF;
           border-color: #0F172A;
-        }
-        .leaflet-control-attribution,
-        .leaflet-attribution-flag {
-          display: none !important;
         }
       `}</style>
     </div>

@@ -1,3 +1,10 @@
 export type { HeritageObject, HeritageCategory, ProtectionStatus } from './model/types';
 export { HERITAGE_OBJECTS } from './model/data';
+export { CATEGORY_LABELS, PROTECTION_LABELS } from './model/labels';
 export { hasPanorama } from './lib/hasPanorama';
+export { findObjectBySlug, formatCoordinates, objectMapHref } from './lib/object';
+export { ObjectCard } from './ui/ObjectCard';
+export { ObjectCover } from './ui/ObjectCover';
+export { ObjectListItem } from './ui/ObjectListItem';
+export { ObjectTags } from './ui/ObjectTags';
+export { ProtectionBadge } from './ui/ProtectionBadge';
