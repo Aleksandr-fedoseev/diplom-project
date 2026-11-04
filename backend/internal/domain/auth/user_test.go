@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -69,5 +70,25 @@ func TestCheckRoleChange(t *testing.T) {
 	}
 	if err := CheckRoleChange(admin, 2, Role("root")); !errors.Is(err, ErrInvalidRole) {
 		t.Fatalf("неизвестная роль: %v", err)
+	}
+}
+
+// Длина пароля считается в символах, а предел bcrypt — в байтах.
+func TestPasswordLength(t *testing.T) {
+	reg := func(pw string) error {
+		r := Registration{Email: "a@test.ru", Name: "А", Password: pw}
+		return r.Normalize()
+	}
+	if err := reg("пароль1"); err == nil { // 7 символов, но 13 байт
+		t.Error("7 русских символов должны отклоняться, хотя это больше 8 байт")
+	}
+	if err := reg("парольку"); err != nil { // 8 символов
+		t.Errorf("8 русских символов: %v", err)
+	}
+	if err := reg(strings.Repeat("я", 36)); err != nil { // 72 байта
+		t.Errorf("36 русских символов (72 байта): %v", err)
+	}
+	if err := reg(strings.Repeat("я", 37)); err == nil { // 74 байта — bcrypt не примет
+		t.Error("пароль длиннее 72 байт должен отклоняться понятной ошибкой")
 	}
 }

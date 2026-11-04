@@ -6,6 +6,7 @@ import (
 	"net/mail"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"heritage-backend/internal/domain/errs"
 )
@@ -44,7 +45,11 @@ type Principal struct {
 	Role   Role
 }
 
-const MinPasswordLen = 8
+const (
+	MinPasswordLen = 8 // символов, а не байт: «пароль» по-русски — 6 символов, но 12 байт
+	// bcrypt учитывает только первые 72 байта и отказывается хешировать пароль длиннее.
+	MaxPasswordBytes = 72
+)
 
 // NormalizeEmail приводит email к одному виду, чтобы «Ivan@Test.ru» и «ivan@test.ru» были одним адресом.
 func NormalizeEmail(email string) string { return strings.ToLower(strings.TrimSpace(email)) }
@@ -63,8 +68,10 @@ func (r *Registration) Normalize() error {
 	switch {
 	case !validEmail(r.Email):
 		return errs.New(errs.Invalid, "некорректный email")
-	case len(r.Password) < MinPasswordLen:
+	case utf8.RuneCountInString(r.Password) < MinPasswordLen:
 		return errs.New(errs.Invalid, "пароль должен быть не короче 8 символов")
+	case len(r.Password) > MaxPasswordBytes:
+		return errs.New(errs.Invalid, "пароль слишком длинный: не больше 72 латинских или 36 русских букв")
 	case r.Name == "":
 		return errs.New(errs.Invalid, "укажите имя")
 	}
