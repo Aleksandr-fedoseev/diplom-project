@@ -15,7 +15,6 @@ export const TOURS: Tour[] = [
     guideRole: 'Краевед, исследователь купеческой Астрахани',
     maxGroupSize: 15,
     nextDate: '18 мая в 15:00',
-    stopsCount: 5,
     stops: [
       {
         title: 'Здание Городской биржи',
@@ -58,7 +57,6 @@ export const TOURS: Tour[] = [
     guideRole: 'Архитектурный историк',
     maxGroupSize: 12,
     nextDate: '25 мая в 16:30',
-    stopsCount: 5,
     stops: [
       {
         title: 'Усадьба А.И. Губина',
@@ -97,7 +95,6 @@ export const TOURS: Tour[] = [
     distance: '2.2 км',
     price: 0,
     isOnlineRoute: true,
-    stopsCount: 4,
     stops: [
       {
         title: 'Астраханский кремль',

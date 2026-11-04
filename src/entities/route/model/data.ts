@@ -9,7 +9,6 @@ export const ROUTES: RouteItem[] = [
     coverImage: '/heritage/birzha/cover.jpg',
     duration: '45 минут',
     distance: '1.2 км',
-    stopsCount: 4,
     objectIds: ['birzha', 'azovo-donskoy-bank', 'dom-agamzhanovoy', 'dom-tavrizova'],
   },
   {
@@ -20,7 +19,6 @@ export const ROUTES: RouteItem[] = [
     coverImage: '/heritage/dom-gubina/cover.jpg',
     duration: '1 час',
     distance: '2.0 км',
-    stopsCount: 4,
     objectIds: ['dom-gubina', 'elektrostantsiya', 'dom-budagova', 'dom-shelehova'],
   },
 ];

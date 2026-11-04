@@ -32,3 +32,8 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
 export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea rows={4} {...props} className={cn(control, className)} />;
 }
+
+// Выпадающий список в стиле полей формы (для фильтров — Select).
+export function FormSelect({ className, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return <select {...props} className={cn(control, className)} />;
+}

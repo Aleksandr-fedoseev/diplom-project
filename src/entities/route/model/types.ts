@@ -6,6 +6,5 @@ export interface RouteItem {
   coverImage: string;
   duration: string;
   distance: string;
-  stopsCount: number;
   objectIds: string[];
 }

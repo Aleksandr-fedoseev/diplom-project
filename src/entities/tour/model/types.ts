@@ -12,7 +12,6 @@ export interface Tour {
   guideRole?: string;
   maxGroupSize?: number;
   nextDate?: string;
-  stopsCount: number;
   stops: {
     title: string;
     address: string;
