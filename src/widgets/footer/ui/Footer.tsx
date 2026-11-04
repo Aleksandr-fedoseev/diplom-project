@@ -75,17 +75,17 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/support#wooden" className="hover:text-white transition-colors">
+                <Link href="/support?tab=wooden" className="hover:text-white transition-colors">
                   Передать старый наличник
                 </Link>
               </li>
               <li>
-                <Link href="/support#archive" className="hover:text-white transition-colors">
+                <Link href="/support?tab=archive" className="hover:text-white transition-colors">
                   Передать архивное фото
                 </Link>
               </li>
               <li>
-                <Link href="/support#story" className="hover:text-white transition-colors">
+                <Link href="/support?tab=story" className="hover:text-white transition-colors">
                   Рассказать историю дома
                 </Link>
               </li>

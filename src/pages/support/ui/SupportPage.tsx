@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Heart } from 'lucide-react';
 import { Chip } from '@/shared/ui';
 import type { MaterialKind } from '../model/materials';
@@ -17,8 +18,17 @@ const TABS: { id: SupportTab; label: string }[] = [
   { id: 'story', label: '4. Рассказать историю дома' },
 ];
 
-export default function SupportPage() {
-  const [activeTab, setActiveTab] = useState<SupportTab>('money');
+const isTab = (v: string | null | undefined): v is SupportTab => TABS.some((t) => t.id === v);
+
+// Вкладка из адреса: /support?tab=wooden (ссылки с главной и из подвала).
+function SupportContent() {
+  const fromUrl = useSearchParams()?.get('tab');
+  const [activeTab, setActiveTab] = useState<SupportTab>(isTab(fromUrl) ? fromUrl : 'money');
+
+  // Переход по ссылке на ту же страницу с другой вкладкой.
+  useEffect(() => {
+    if (isTab(fromUrl)) setActiveTab(fromUrl);
+  }, [fromUrl]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 w-full bg-white text-slate-900">
@@ -60,5 +70,13 @@ export default function SupportPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SupportPage() {
+  return (
+    <Suspense>
+      <SupportContent />
+    </Suspense>
   );
 }

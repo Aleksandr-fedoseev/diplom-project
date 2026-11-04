@@ -256,7 +256,7 @@ export default function WoodenMuseumPage() {
           </p>
         </div>
         <Link
-          href="/support#wooden"
+          href="/support?tab=wooden"
           className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-slate-950 hover:bg-slate-800 text-white rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors shrink-0"
         >
           <span>Передать в музей</span>
