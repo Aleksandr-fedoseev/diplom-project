@@ -1,11 +1,16 @@
 'use client';
 
+import { Suspense, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { HERITAGE_OBJECTS, ObjectCard } from '@/entities/heritage-object';
 import { FilterSelects, useObjectFilter } from '@/features/filter-objects';
 import { PageHeader, SearchInput } from '@/shared/ui';
 
-export default function ObjectsPage() {
-  const { filter, update, filtered } = useObjectFilter(HERITAGE_OBJECTS);
+function Catalog() {
+  // ?q= — запрос из поиска в шапке сайта.
+  const q = useSearchParams()?.get('q') ?? '';
+  const { filter, update, filtered } = useObjectFilter(HERITAGE_OBJECTS, { query: q });
+  useEffect(() => update({ query: q }), [q]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 w-full">
@@ -35,5 +40,13 @@ export default function ObjectsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ObjectsPage() {
+  return (
+    <Suspense>
+      <Catalog />
+    </Suspense>
   );
 }

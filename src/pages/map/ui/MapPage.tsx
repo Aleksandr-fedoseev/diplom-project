@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { findObjectBySlug, HERITAGE_OBJECTS, ObjectListItem, type HeritageObject } from '@/entities/heritage-object';
 import { FilterChips, useObjectFilter } from '@/features/filter-objects';
+import { cn } from '@/shared/lib';
 import { SearchInput } from '@/shared/ui';
 import ObjectDrawer from './ObjectDrawer';
 
@@ -25,6 +26,8 @@ function MapView() {
   const objectSlug = useSearchParams()?.get('object') ?? null;
   const { filter, update, filtered } = useObjectFilter(HERITAGE_OBJECTS);
   const [active, setActive] = useState<HeritageObject | null>(null);
+  // На телефоне список и карта не помещаются рядом — показываем что-то одно.
+  const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
   const select = useCallback((o: HeritageObject) => setActive(o), []);
 
   // /map?object=dom-kononova — сразу открыть объект.
@@ -48,8 +51,28 @@ function MapView() {
         </div>
       </div>
 
+      <div role="tablist" aria-label="Вид" className="md:hidden grid grid-cols-2 gap-1 p-1 m-2 bg-slate-200/80 rounded-lg text-xs font-semibold">
+        {(['list', 'map'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            role="tab"
+            aria-selected={mobileView === v}
+            onClick={() => setMobileView(v)}
+            className={cn('py-1.5 rounded-md', mobileView === v ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600')}
+          >
+            {v === 'list' ? `Список (${filtered.length})` : 'Карта'}
+          </button>
+        ))}
+      </div>
+
       <div className="flex-1 flex overflow-hidden relative">
-        <div className="w-full md:w-[340px] lg:w-[380px] bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-hidden z-10">
+        <div
+          className={cn(
+            'w-full md:w-[340px] lg:w-[380px] bg-white border-r border-slate-200 flex-col shrink-0 overflow-hidden z-10',
+            mobileView === 'list' ? 'flex' : 'hidden md:flex',
+          )}
+        >
           <div className="p-3 border-b border-slate-100 bg-slate-50 text-xs font-medium text-slate-600 flex justify-between items-center">
             <span>Объектов: {filtered.length}</span>
             <span className="text-slate-400">Кликните для просмотра</span>
@@ -65,7 +88,7 @@ function MapView() {
           </div>
         </div>
 
-        <div className="flex-1 relative overflow-hidden bg-slate-200">
+        <div className={cn('flex-1 relative overflow-hidden bg-slate-200', mobileView === 'list' && 'hidden md:block')}>
           <HeritageMap objects={filtered} activeObject={active} onSelectObject={select} />
         </div>
 

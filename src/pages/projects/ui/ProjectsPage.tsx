@@ -1,6 +1,5 @@
-import React from 'react';
 import Link from 'next/link';
-import { Compass, Building2, ArrowRight, ShieldCheck, Hammer } from 'lucide-react';
+import { Building2, Compass } from 'lucide-react';
 
 export default function ProjectsPage() {
   return (

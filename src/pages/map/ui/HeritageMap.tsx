@@ -53,7 +53,12 @@ export default function HeritageMap({
     markersLayerRef.current = L.layerGroup().addTo(map);
     mapInstanceRef.current = map;
 
+    // Карту могли создать скрытой (вкладка «Список» на телефоне) — при появлении пересчитываем размер.
+    const resize = new ResizeObserver(() => map.invalidateSize());
+    resize.observe(mapContainerRef.current);
+
     return () => {
+      resize.disconnect();
       map.remove();
       mapInstanceRef.current = null;
     };
