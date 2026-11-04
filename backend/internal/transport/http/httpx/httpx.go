@@ -5,8 +5,10 @@ package httpx
 import (
 	"encoding/json"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -15,12 +17,13 @@ import (
 
 // statusByKind — единственное место, где род ошибки домена превращается в HTTP-код.
 var statusByKind = map[errs.Kind]int{
-	errs.Invalid:      http.StatusBadRequest,
-	errs.Unauthorized: http.StatusUnauthorized,
-	errs.Forbidden:    http.StatusForbidden,
-	errs.NotFound:     http.StatusNotFound,
-	errs.Conflict:     http.StatusConflict,
-	errs.Unavailable:  http.StatusServiceUnavailable,
+	errs.Invalid:         http.StatusBadRequest,
+	errs.Unauthorized:    http.StatusUnauthorized,
+	errs.Forbidden:       http.StatusForbidden,
+	errs.NotFound:        http.StatusNotFound,
+	errs.Conflict:        http.StatusConflict,
+	errs.Unavailable:     http.StatusServiceUnavailable,
+	errs.TooManyRequests: http.StatusTooManyRequests,
 }
 
 type errorBody struct {
@@ -54,6 +57,12 @@ func BadRequest(msg string) error { return errs.New(errs.Invalid, msg) }
 // Unauthorized и Forbidden — ответы middleware на отсутствие входа и прав.
 func Unauthorized(msg string) error { return errs.New(errs.Unauthorized, msg) }
 func Forbidden(msg string) error    { return errs.New(errs.Forbidden, msg) }
+
+// TooManyRequests — ответ 429; retryAfter уходит в заголовок Retry-After (секунды).
+func TooManyRequests(w http.ResponseWriter, msg string, retryAfter time.Duration) error {
+	w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(retryAfter.Seconds()))))
+	return errs.New(errs.TooManyRequests, msg)
+}
 
 // DecodeJSON читает тело запроса в v и отклоняет неизвестные поля,
 // чтобы опечатка в названии поля не проходила молча.

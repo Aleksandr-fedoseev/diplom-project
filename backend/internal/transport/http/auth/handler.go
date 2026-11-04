@@ -5,6 +5,7 @@ package auth
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -13,16 +14,37 @@ import (
 	"heritage-backend/internal/transport/http/middleware"
 )
 
+// Ограничения против подбора пароля и массовой регистрации. По IP — против одного источника,
+// по email — против перебора пароля к одной учётной записи с разных адресов.
+const (
+	loginPerIP       = 10
+	loginPerEmail    = 10
+	registerPerIP    = 5
+	loginWindow      = time.Minute
+	loginEmailWindow = 15 * time.Minute
+	registerWindow   = time.Hour
+)
+
 type Handler struct {
-	svc auth.Service
+	svc          auth.Service
+	loginByIP    *middleware.RateLimiter
+	loginByEmail *middleware.RateLimiter
+	registerByIP *middleware.RateLimiter
 }
 
-func NewHandler(svc auth.Service) *Handler { return &Handler{svc: svc} }
+func NewHandler(svc auth.Service) *Handler {
+	return &Handler{
+		svc:          svc,
+		loginByIP:    middleware.NewRateLimiter(loginPerIP, loginWindow),
+		loginByEmail: middleware.NewRateLimiter(loginPerEmail, loginEmailWindow),
+		registerByIP: middleware.NewRateLimiter(registerPerIP, registerWindow),
+	}
+}
 
 // Routes подключается по адресу /api/auth.
 func (h *Handler) Routes(r chi.Router) {
-	r.Method(http.MethodPost, "/register", httpx.Handler(h.register))
-	r.Method(http.MethodPost, "/login", httpx.Handler(h.login))
+	r.With(middleware.LimitByIP(h.registerByIP)).Method(http.MethodPost, "/register", httpx.Handler(h.register))
+	r.With(middleware.LimitByIP(h.loginByIP)).Method(http.MethodPost, "/login", httpx.Handler(h.login))
 	r.With(middleware.RequireRole(auth.RoleUser)).Method(http.MethodGet, "/me", httpx.Handler(h.me))
 }
 
@@ -50,6 +72,9 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) error {
 	var in loginRequest
 	if err := httpx.DecodeJSON(r, &in); err != nil {
 		return err
+	}
+	if ok, retry := h.loginByEmail.Allow(auth.NormalizeEmail(in.Email)); !ok {
+		return httpx.TooManyRequests(w, "слишком много попыток входа, повторите позже", retry)
 	}
 	token, u, err := h.svc.Login(r.Context(), in.Email, in.Password)
 	if err != nil {

@@ -7,11 +7,12 @@ type Service interface {
 	Register(ctx context.Context, in Registration) (User, error)
 	// Login возвращает токен для заголовка Authorization: Bearer <token>.
 	Login(ctx context.Context, email, password string) (token string, u User, err error)
-	// Authenticate проверяет токен и возвращает, кто делает запрос.
+	// Authenticate проверяет токен и возвращает, кто делает запрос. Роль — из БД, а не из токена;
+	// заблокированному — ErrBlocked, удалённому — ErrInvalidToken.
 	Authenticate(ctx context.Context, token string) (Principal, error)
 	GetByID(ctx context.Context, id int64) (User, error)
-	// EnsureActive — ErrBlocked, если пользователь заблокирован. Токен заблокированного действует
-	// до истечения срока, поэтому модули проверяют блокировку перед записью.
+	// EnsureActive — ErrBlocked, если пользователь заблокирован. Нужен модулям, которые проверяют
+	// пользователя внутри своей транзакции, а не только на входе запроса.
 	EnsureActive(ctx context.Context, id int64) error
 	List(ctx context.Context, limit, offset int) ([]User, error)
 	SetRole(ctx context.Context, actor Principal, userID int64, role Role) (User, error)

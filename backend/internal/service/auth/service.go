@@ -59,12 +59,24 @@ func (s *Service) Login(ctx context.Context, email, password string) (string, au
 	return token, u, nil
 }
 
-func (s *Service) Authenticate(_ context.Context, token string) (auth.Principal, error) {
+// Authenticate: токен доказывает только, кто это. Роль и блокировку берём из БД,
+// чтобы снятие роли или блокировка действовали сразу, а не после истечения токена.
+func (s *Service) Authenticate(ctx context.Context, token string) (auth.Principal, error) {
 	id, role, err := s.tokens.Parse(token)
 	if err != nil || !auth.Role(role).Valid() {
 		return auth.Principal{}, auth.ErrInvalidToken
 	}
-	return auth.Principal{UserID: id, Role: auth.Role(role)}, nil
+	u, err := s.users.ByID(ctx, id)
+	if errors.Is(err, auth.ErrUserNotFound) {
+		return auth.Principal{}, auth.ErrInvalidToken
+	}
+	if err != nil {
+		return auth.Principal{}, err
+	}
+	if u.IsBlocked {
+		return auth.Principal{}, auth.ErrBlocked
+	}
+	return auth.Principal{UserID: u.ID, Role: u.Role}, nil
 }
 
 func (s *Service) GetByID(ctx context.Context, id int64) (auth.User, error) {

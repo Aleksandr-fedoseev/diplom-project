@@ -187,3 +187,36 @@ func TestSetRoleAndModeratorLimits(t *testing.T) {
 		t.Fatalf("модератор блокирует модератора: %v", err)
 	}
 }
+
+// Выданный токен не продлевает прав: снятие роли и блокировка действуют сразу.
+func TestAuthenticateUsesCurrentRoleAndBlock(t *testing.T) {
+	svc, _ := newTestService()
+	ctx := context.Background()
+	admin := auth.Principal{UserID: 100, Role: auth.RoleAdmin}
+	u, _ := svc.Register(ctx, auth.Registration{Email: "m@test.ru", Password: "password1", Name: "M"})
+	if _, err := svc.SetRole(ctx, admin, u.ID, auth.RoleModerator); err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := svc.Login(ctx, "m@test.ru", "password1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.SetRole(ctx, admin, u.ID, auth.RoleUser); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := svc.Authenticate(ctx, token); err != nil || p.Role != auth.RoleUser {
+		t.Fatalf("после снятия роли модератора: %+v, %v", p, err)
+	}
+
+	if _, err := svc.SetBlocked(ctx, admin, u.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Authenticate(ctx, token); !errors.Is(err, auth.ErrBlocked) {
+		t.Fatalf("токен заблокированного: %v", err)
+	}
+
+	if _, err := svc.Authenticate(ctx, "999:user"); !errors.Is(err, auth.ErrInvalidToken) {
+		t.Fatalf("токен несуществующего пользователя: %v", err)
+	}
+}
