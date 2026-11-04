@@ -12,7 +12,7 @@ import {
   Layers,
   Info
 } from 'lucide-react';
-import { HERITAGE_OBJECTS } from '@/data/heritage';
+import { HERITAGE_OBJECTS, hasPanorama } from '@/data/heritage';
 import { HeritageObject } from '@/types/heritage';
 import ObjectDetailDrawer from '@/components/map/ObjectDetailDrawer';
 
@@ -53,7 +53,7 @@ function MapContent() {
 
   const filtered = HERITAGE_OBJECTS.filter((item) => {
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
-    const matches360 = !only360 || item.hasPanorama360;
+    const matches360 = !only360 || hasPanorama(item);
     const matchesSearch = searchQuery === '' || 
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -178,7 +178,7 @@ function MapContent() {
                           <span className="text-[10px] font-semibold text-blue-600 uppercase truncate">
                             {item.yearBuilt} г. • {item.architecturalStyle}
                           </span>
-                          {item.hasPanorama360 && (
+                          {hasPanorama(item) && (
                             <span className="bg-blue-600 text-white text-[8px] font-bold px-1 rounded shrink-0">
                               360°
                             </span>

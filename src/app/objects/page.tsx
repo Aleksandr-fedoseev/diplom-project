@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Search, Filter, Eye, Volume2, ArrowRight, Building2, MapPin } from 'lucide-react';
-import { HERITAGE_OBJECTS } from '@/data/heritage';
+import { HERITAGE_OBJECTS, hasPanorama } from '@/data/heritage';
 
 export default function ObjectsPage() {
   const [search, setSearch] = useState('');
@@ -95,7 +95,7 @@ export default function ObjectsPage() {
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   <div className="absolute top-3 right-3 flex gap-1.5">
-                    {item.hasPanorama360 && (
+                    {hasPanorama(item) && (
                       <span className="bg-slate-900/85 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded shadow flex items-center gap-1">
                         <Eye className="w-3 h-3 text-blue-400" />
                         <span>360°</span>

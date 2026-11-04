@@ -8,16 +8,15 @@ import {
   Volume2, 
   MapPin, 
   Calendar, 
-  RotateCw, 
-  Maximize2,
   ShieldCheck,
   Share2,
-  Info,
   BookOpen,
   ArrowRight
 } from 'lucide-react';
 import { HeritageObject } from '@/types/heritage';
 import { STORIES } from '@/data/stories';
+import { hasPanorama } from '@/data/heritage';
+import PanoramaViewer from '@/components/panorama/PanoramaViewer';
 
 interface ObjectDetailDrawerProps {
   object: HeritageObject | null;
@@ -85,7 +84,7 @@ export default function ObjectDetailDrawer({ object, onClose }: ObjectDetailDraw
           Описание и история
         </button>
 
-        {object.hasPanorama360 && (
+        {hasPanorama(object) && (
           <button
             onClick={() => setActiveTab('panorama')}
             className={`py-3 px-3 border-b-2 flex items-center gap-1.5 transition-colors ${
@@ -211,41 +210,8 @@ export default function ObjectDetailDrawer({ object, onClose }: ObjectDetailDraw
         )}
 
         {/* TAB 2: Panorama 360 Player */}
-        {activeTab === 'panorama' && object.hasPanorama360 && (
-          <div className="space-y-4">
-            <div className="relative h-72 sm:h-80 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 flex flex-col justify-between p-4">
-              <div className="flex items-center justify-between text-white text-xs">
-                <span className="bg-slate-900/80 px-2.5 py-1 rounded backdrop-blur-md">
-                  Сферическая панорама 360°
-                </span>
-                <div className="flex gap-1.5">
-                  <button className="p-1.5 bg-slate-900/80 rounded hover:bg-slate-800">
-                    <RotateCw className="w-3.5 h-3.5" />
-                  </button>
-                  <button className="p-1.5 bg-slate-900/80 rounded hover:bg-slate-800">
-                    <Maximize2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="text-center text-slate-300 text-xs bg-slate-900/80 p-4 rounded-lg self-center max-w-xs backdrop-blur-md border border-slate-700">
-                <Eye className="w-6 h-6 text-blue-400 mx-auto mb-1.5 animate-pulse" />
-                <p className="font-semibold text-white">Интерактивный плеер Photo Sphere Viewer</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Вращайте обзор курсором или пальцем на 360°</p>
-              </div>
-
-              <div className="text-center text-white/70 text-[10px]">
-                Оцифровано в разрешении 8K
-              </div>
-            </div>
-
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-start gap-2">
-              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-              <span>
-                Панорама привязана к точке на карте. Вы можете осматривать интерьеры и фасад, оставаясь на интерактивной карте.
-              </span>
-            </div>
-          </div>
+        {activeTab === 'panorama' && hasPanorama(object) && (
+          <PanoramaViewer key={object.id} panoramas={object.panoramas ?? []} heightClassName="h-72 sm:h-80" />
         )}
 
         {/* TAB 3: Audio Guide */}

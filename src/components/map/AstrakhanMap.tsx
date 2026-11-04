@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { HeritageObject } from '@/types/heritage';
-import { ASTRAKHAN_BOUNDS } from '@/data/heritage';
+import { ASTRAKHAN_BOUNDS, hasPanorama } from '@/data/heritage';
 
 interface AstrakhanMapProps {
   objects: HeritageObject[];
@@ -73,7 +73,7 @@ export default function AstrakhanMap({
       const iconHtml = `
         <div class="custom-osm-pin ${isSelected ? 'is-active' : ''} ${isLost ? 'is-lost' : ''}">
           <div class="pin-badge">
-            ${obj.hasPanorama360 ? '<span class="vr-badge">360°</span>' : ''}
+            ${hasPanorama(obj) ? '<span class="vr-badge">360°</span>' : ''}
             <span class="pin-symbol">${isLost ? '⚑' : '🏛'}</span>
           </div>
           <div class="pin-title">${obj.title}</div>

@@ -10,12 +10,11 @@ import {
   ShieldCheck, 
   Share2, 
   ArrowLeft,
-  RotateCw,
-  Maximize2,
   FileText,
   Compass
 } from 'lucide-react';
-import { HERITAGE_OBJECTS } from '@/data/heritage';
+import { HERITAGE_OBJECTS, hasPanorama } from '@/data/heritage';
+import PanoramaViewer from '@/components/panorama/PanoramaViewer';
 
 export default function ObjectDetailPage() {
   const params = useParams();
@@ -99,7 +98,7 @@ export default function ObjectDetailPage() {
             <span>Паспорт и историческая справка</span>
           </button>
 
-          {object.hasPanorama360 && (
+          {hasPanorama(object) && (
             <button
               onClick={() => setActiveTab('panorama')}
               className={`px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors flex items-center gap-2 ${
@@ -175,37 +174,8 @@ export default function ObjectDetailPage() {
           )}
 
           {/* TAB 2: 360° Panorama Viewer */}
-          {activeTab === 'panorama' && object.hasPanorama360 && (
-            <div className="space-y-4">
-              <div className="relative h-[480px] sm:h-[540px] rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-xl flex flex-col justify-between p-6">
-                
-                <div className="flex items-center justify-between z-10">
-                  <div className="bg-slate-900/90 text-white text-xs font-semibold px-3 py-1.5 rounded-lg backdrop-blur-md">
-                    Photo Sphere Viewer 360° • WebGL
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="p-2 bg-slate-900/90 text-white rounded-lg hover:bg-slate-800 transition-colors">
-                      <RotateCw className="w-4 h-4" />
-                    </button>
-                    <button className="p-2 bg-slate-900/90 text-white rounded-lg hover:bg-slate-800 transition-colors">
-                      <Maximize2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="text-center text-slate-300 text-sm bg-slate-900/80 p-6 rounded-xl self-center max-w-md backdrop-blur-md border border-slate-700">
-                  <Eye className="w-8 h-8 text-blue-400 mx-auto mb-2 animate-pulse" />
-                  <p className="font-semibold text-white">Интерактивный плеер сферической панорамы</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Эквидистантная проекция 8K с хотспотами интерьеров и фасада памятника.
-                  </p>
-                </div>
-
-                <div className="text-center text-white/80 text-xs bg-slate-900/70 py-1.5 px-4 rounded-lg self-center backdrop-blur-md">
-                  Управление: ЛКМ/Сенсор для вращения обзора
-                </div>
-              </div>
-            </div>
+          {activeTab === 'panorama' && hasPanorama(object) && (
+            <PanoramaViewer key={object.id} panoramas={object.panoramas ?? []} />
           )}
 
           {/* TAB 3: Audio Guide */}
