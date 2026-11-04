@@ -7,6 +7,14 @@ export type HeritageCategory =
   | 'modern'      // Архитектура модерна
   | 'lost';       // Утраченное наследие
 
+// Панорама 360° (равнопромежуточная проекция 2:1) — те же поля, что у медиафайла
+// kind=panorama в API бэкенда.
+export interface Panorama {
+  url: string;
+  source: 'photo' | 'ai_reconstruction'; // ai_reconstruction — подписывается «реконструкция ИИ»
+  caption: string;
+}
+
 export interface HeritageObject {
   id: string;
   slug: string;
@@ -25,8 +33,7 @@ export interface HeritageObject {
   coverImage: string;
   archiveImage?: string;
   archiveYear?: string;
-  hasPanorama360: boolean;
-  panoramaImage?: string;
+  panoramas?: Panorama[];
   hasAudioGuide: boolean;
   audioDuration?: string;
   shortDescription: string;
