@@ -3,13 +3,11 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
-import { findObjectBySlug, HERITAGE_OBJECTS, ObjectListItem, type HeritageObject } from '@/entities/heritage-object';
+import { ObjectListItem, useObjects, type HeritageObject } from '@/entities/heritage-object';
 import { FilterChips, useObjectFilter } from '@/features/filter-objects';
 import { cn } from '@/shared/lib';
-import { SearchInput } from '@/shared/ui';
+import { ErrorMessage, SearchInput, Spinner } from '@/shared/ui';
 import ObjectDrawer from './ObjectDrawer';
-
-const Spinner = () => <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />;
 
 // Leaflet работает только в браузере, поэтому карта загружается без серверного рендеринга.
 const HeritageMap = dynamic(() => import('./HeritageMap'), {
@@ -22,18 +20,21 @@ const HeritageMap = dynamic(() => import('./HeritageMap'), {
   ),
 });
 
+const NO_OBJECTS: HeritageObject[] = [];
+
 function MapView() {
   const objectSlug = useSearchParams()?.get('object') ?? null;
-  const { filter, update, filtered } = useObjectFilter(HERITAGE_OBJECTS);
+  const objects = useObjects();
+  const { filter, update, filtered } = useObjectFilter(objects.data ?? NO_OBJECTS);
   const [active, setActive] = useState<HeritageObject | null>(null);
   // На телефоне список и карта не помещаются рядом — показываем что-то одно.
   const [mobileView, setMobileView] = useState<'list' | 'map'>('list');
   const select = useCallback((o: HeritageObject) => setActive(o), []);
 
-  // /map?object=dom-kononova — сразу открыть объект.
+  // /map?object=dom-kononova — сразу открыть объект, как только список загрузится.
   useEffect(() => {
-    if (objectSlug) setActive(findObjectBySlug(objectSlug) ?? null);
-  }, [objectSlug]);
+    if (objectSlug && objects.data) setActive(objects.data.find((o) => o.slug === objectSlug) ?? null);
+  }, [objectSlug, objects.data]);
 
   return (
     <div className="h-[calc(100vh-4rem)] sm:h-[calc(100vh-5rem)] flex flex-col bg-slate-100 overflow-hidden relative">
@@ -78,7 +79,13 @@ function MapView() {
             <span className="text-slate-400">Кликните для просмотра</span>
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-            {filtered.length === 0 ? (
+            {objects.error ? (
+              <ErrorMessage className="m-3" error={objects.error} onRetry={() => objects.refetch()} />
+            ) : objects.isPending ? (
+              <div className="p-8 flex justify-center">
+                <Spinner />
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="p-8 text-center text-slate-500 text-sm">По заданному фильтру объектов не найдено.</div>
             ) : (
               filtered.map((o) => (

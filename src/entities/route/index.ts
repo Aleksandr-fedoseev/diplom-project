@@ -1,3 +1,3 @@
-export type { RouteItem } from './model/types';
-export { ROUTES } from './model/data';
-export { routeStops } from './lib/stops';
+export type { RouteItem, RouteStop } from './model/types';
+export { routeApi, routeKeys } from './api/routeApi';
+export { formatDistance, formatDuration } from './lib/format';

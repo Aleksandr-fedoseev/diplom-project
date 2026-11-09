@@ -2,14 +2,17 @@
 
 import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { HERITAGE_OBJECTS, ObjectCard } from '@/entities/heritage-object';
+import { ObjectCard, useObjects, type HeritageObject } from '@/entities/heritage-object';
 import { FilterSelects, useObjectFilter } from '@/features/filter-objects';
-import { PageHeader, SearchInput } from '@/shared/ui';
+import { PageHeader, QueryState, SearchInput } from '@/shared/ui';
+
+const NO_OBJECTS: HeritageObject[] = [];
 
 function Catalog() {
   // ?q= — запрос из поиска в шапке сайта.
   const q = useSearchParams()?.get('q') ?? '';
-  const { filter, update, filtered } = useObjectFilter(HERITAGE_OBJECTS, { query: q });
+  const objects = useObjects();
+  const { filter, update, filtered } = useObjectFilter(objects.data ?? NO_OBJECTS, { query: q });
   useEffect(() => update({ query: q }), [q]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -30,15 +33,19 @@ function Catalog() {
         <FilterSelects filter={filter} onChange={update} />
       </div>
 
-      {filtered.length === 0 ? (
-        <p className="py-16 text-center text-sm text-slate-500">По заданному фильтру объектов не найдено.</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((object) => (
-            <ObjectCard key={object.id} object={object} />
-          ))}
-        </div>
-      )}
+      <QueryState query={objects} loadingLabel="Загрузка каталога...">
+        {() =>
+          filtered.length === 0 ? (
+            <p className="py-16 text-center text-sm text-slate-500">По заданному фильтру объектов не найдено.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filtered.map((object) => (
+                <ObjectCard key={object.id} object={object} />
+              ))}
+            </div>
+          )
+        }
+      </QueryState>
     </div>
   );
 }

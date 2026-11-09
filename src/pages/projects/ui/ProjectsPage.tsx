@@ -22,21 +22,21 @@ export default function ProjectsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         
         {/* Project 1: Интерактивная карта */}
-        <div className="bg-slate-950 text-white rounded-3xl p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden group shadow-lg">
+        <div className="bg-ink-950 text-snow rounded-3xl p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden group shadow-lg">
           <div 
             className="absolute inset-0 bg-cover bg-center opacity-30 group-hover:scale-105 transition-transform duration-500"
             style={{ backgroundImage: 'url(/heritage/birzha/cover.jpg)' }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/70 to-transparent" />
 
           <div className="relative z-10 space-y-4">
-            <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded text-[10px] font-bold uppercase tracking-wider text-white">
+            <span className="px-3 py-1 bg-snow/20 backdrop-blur-md rounded text-[10px] font-bold uppercase tracking-wider text-snow">
               Флагманский геосервис
             </span>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-snow">
               Интерактивная карта культурного наследия
             </h2>
-            <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+            <p className="text-sm sm:text-base text-ink-300 leading-relaxed">
               Интерактивная карта памятников и исторических зданий города. Удобный поиск по улицам, архивные фотографии, описания архитектурных стилей и просмотр истории каждого дома прямо на карте Астрахани.
             </p>
           </div>
@@ -44,7 +44,7 @@ export default function ProjectsPage() {
           <div className="relative z-10 pt-8">
             <Link
               href="/map"
-              className="inline-flex items-center gap-2 px-6 py-3.5 bg-white hover:bg-slate-100 text-slate-950 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-sm"
+              className="inline-flex items-center gap-2 px-6 py-3.5 bg-snow hover:bg-ink-100 text-ink-950 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-sm"
             >
               <Compass className="w-4 h-4" />
               <span>Перейти к интерактивной карте</span>

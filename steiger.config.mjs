@@ -10,4 +10,10 @@ export default defineConfig([
     files: ['./src/entities/**'],
     rules: { 'fsd/insignificant-slice': 'off' },
   },
+  {
+    // Тестовые данные сущности открыты отдельным входом testing.ts, чтобы не попадать
+    // в публичный API для кода сайта. Импортировать их можно только из тестов.
+    files: ['./src/**/*.test.ts', './src/**/*.test.tsx'],
+    rules: { 'fsd/no-public-api-sidestep': 'off' },
+  },
 ]);

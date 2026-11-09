@@ -2,18 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg-main: #F8FAFC;
-  --text-main: #0F172A;
-  --text-muted: #64748B;
-  --border-color: #E2E8F0;
-  --brand-primary: #1E293B;
-  --brand-accent: #2563EB;
-}
-
+/* Цвета берутся из переменных палитры (tailwind.config.ts): в тёмной теме они меняются сами. */
 body {
-  background-color: var(--bg-main);
-  color: var(--text-main);
+  background-color: rgb(var(--slate-50));
+  color: rgb(var(--slate-900));
   font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -26,22 +18,22 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #F1F5F9;
+  background: rgb(var(--slate-100));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
+  background: rgb(var(--slate-300));
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: rgb(var(--slate-400));
 }
 
 /* Clean glass effect */
 .clean-card {
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
+  background: rgb(var(--white));
+  border: 1px solid rgb(var(--slate-200));
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
 }
 
@@ -50,7 +42,18 @@ body {
 }
 
 .clean-card-hover:hover {
-  border-color: #CBD5E1;
+  border-color: rgb(var(--slate-300));
   box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
   transform: translateY(-2px);
+}
+
+/* Тёмная тема: подложку OpenStreetMap переворачиваем фильтром — своих тёмных плиток у OSM нет.
+   Значки объектов поверх карты не трогаем. */
+.dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9);
+}
+
+/* Фотографии в тёмной теме чуть приглушаем, чтобы не слепили. */
+.dark img:not(.leaflet-tile) {
+  filter: brightness(0.92);
 }

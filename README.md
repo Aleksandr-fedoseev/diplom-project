@@ -67,32 +67,46 @@ tools/panorama/pano.sh фото.jpg kononov 95 6   # → ComfyUI/output/pano/kon
 
 ## Запуск
 
-**Сайт** (нужен Node.js 20+):
+Сайт и сервер — две программы, связанные по HTTP: страницы в браузере обращаются к REST API
+сервера (`http://localhost:8080/api/...`, JSON, вход — заголовок `Authorization: Bearer`).
 
-```bash
-npm ci
-npm run dev          # http://localhost:3000
-```
-
-**Сервер** (нужен Docker):
+**1. Сервер** (нужен Docker):
 
 ```bash
 cd backend
-cp .env.example .env              # задать пароли
-docker compose up -d --build
+cp .env.example .env              # задать пароли и ADMIN_EMAIL / ADMIN_PASSWORD
+docker compose up -d --build      # PostgreSQL + PostGIS, SeaweedFS, сервер
 curl http://localhost:8080/api/health
 ```
 
-Сейчас сайт работает на статических данных из `src/data/`; подключение страниц к API сервера —
-следующий этап.
+**2. Стартовые данные** — фото и панорамы объектов, маршруты, демо-пользователи:
+
+```bash
+tools/seed/seed.sh                # из корня репозитория; нужны curl и jq
+```
+
+**3. Сайт** (нужен Node.js 20+):
+
+```bash
+cp .env.example .env.local        # адрес API
+npm ci
+npm run dev                       # http://localhost:3000
+npm test                          # тесты; npm run lint:fsd — проверка слоёв FSD
+```
+
+**Роли для проверки:** администратор — из `backend/.env`; `moderator@demo.test` и
+`user@demo.test` с паролем `demo-password` создаёт скрипт из шага 2. Разделы по ролям:
+`/account` — любой вошедший, `/moderation` — модератор, `/admin` — администратор.
 
 ## Структура репозитория
 
 ```
-├── src/                 клиент Next.js: страницы (app/), компоненты, типы, данные
+├── app/                 маршруты Next.js (тонкие, отдают страницы из src/pages)
+├── src/                 клиент по Feature-Sliced Design: app, pages, widgets, features, entities, shared
 ├── public/              изображения объектов, панорамы, Pannellum
 ├── backend/             сервер на Go, миграции БД, docker-compose.yml
 ├── tools/panorama/      создание панорамы 360° по фотографии (инструмент модератора)
+├── tools/seed/          наполнение запущенного сервера стартовыми данными
 ├── Diagrams/            BPMN (AS-IS, TO-BE), Use Case, развёртывание, модели данных
 └── Docs/                пояснения к ВКР, текст доклада, вопросы к защите, презентация
 ```

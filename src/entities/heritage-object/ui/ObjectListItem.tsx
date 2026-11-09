@@ -1,6 +1,7 @@
 import { MapPin } from 'lucide-react';
 import { cn } from '@/shared/lib';
 import { hasPanorama } from '../lib/hasPanorama';
+import { objectSubtitle } from '../lib/object';
 import type { HeritageObject } from '../model/types';
 import { ObjectCover } from './ObjectCover';
 import { ProtectionBadge } from './ProtectionBadge';
@@ -29,7 +30,7 @@ export function ObjectListItem({ object, selected, onSelect }: ObjectListItemPro
         <div>
           <div className="flex items-center justify-between gap-1">
             <span className="text-[10px] font-semibold text-blue-600 uppercase truncate">
-              {object.yearBuilt} г. • {object.architecturalStyle}
+              {objectSubtitle(object)}
             </span>
             {hasPanorama(object) && (
               <span className="bg-blue-600 text-white text-[8px] font-bold px-1 rounded shrink-0">360°</span>

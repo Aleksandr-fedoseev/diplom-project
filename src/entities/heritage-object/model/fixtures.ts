@@ -1,8 +1,11 @@
 import type { HeritageObject } from './types';
 
-export const HERITAGE_OBJECTS: HeritageObject[] = [
+// Объекты из прототипа — данные для тестов. На сайте каталог берётся из API, в базу эти же
+// объекты попадают миграциями 00002 и 00007.
+type Raw = Omit<HeritageObject, 'id' | 'hasPanorama' | 'isPublished'>;
+
+const RAW: Raw[] = [
   {
-    id: 'birzha',
     slug: 'birzha',
     title: 'Здание Городской биржи',
     category: 'modern',
@@ -19,7 +22,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Биржа', 'Модерн', 'Стрелка', 'Волга', 'Федеральный ОКН'],
   },
   {
-    id: 'azovo-donskoy-bank',
     slug: 'azovo-donskoy-bank',
     title: 'Азово-Донской коммерческий банк',
     category: 'modern',
@@ -36,7 +38,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Лидваль', 'Северный модерн', 'Банк', 'Никольская'],
   },
   {
-    id: 'dom-gubina',
     slug: 'dom-gubina',
     title: 'Городская усадьба А.И. Губина',
     category: 'manor',
@@ -53,7 +54,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Усадьба', 'Кутум', 'Эклектика', 'Атланты'],
   },
   {
-    id: 'dom-shelehova',
     slug: 'dom-shelehova',
     title: 'Усадьба купца М.А. Шелехова',
     category: 'manor',
@@ -70,7 +70,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Усадьба', 'Кутум', 'Маскароны', 'Эклектика'],
   },
   {
-    id: 'dom-s-butylkami',
     slug: 'dom-s-butylkami',
     title: 'Доходный дом Багирова («Дом с бутылками»)',
     category: 'modern',
@@ -87,7 +86,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Белый город', 'Кирпичный стиль', 'Свердлова'],
   },
   {
-    id: 'dom-agamzhanovoy',
     slug: 'dom-agamzhanovoy',
     title: 'Доходный дом Агамжановой',
     category: 'manor',
@@ -104,7 +102,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Никольская', 'Коса', 'Доходный дом', 'XIX век'],
   },
   {
-    id: 'dom-tavrizova',
     slug: 'dom-tavrizova',
     title: 'Дом купца Тавризова',
     category: 'manor',
@@ -121,7 +118,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Никольская', 'Купцы', 'Ренессанс'],
   },
   {
-    id: 'dom-budagova',
     slug: 'dom-budagova',
     title: 'Усадьба купца Будагова',
     category: 'manor',
@@ -138,7 +134,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Закутумье', 'Кутум', 'Усадьба'],
   },
   {
-    id: 'elektrostantsiya',
     slug: 'elektrostantsiya',
     title: 'Городская электрическая станция',
     category: 'modern',
@@ -155,7 +150,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Промдизайн', 'Электростанция', 'Неоготика'],
   },
   {
-    id: 'dom-nyunina',
     slug: 'dom-nyunina',
     title: 'Дом купца Нюнина',
     category: 'manor',
@@ -172,7 +166,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Белый город', 'Советская', 'Центр'],
   },
   {
-    id: 'dom-boyko',
     slug: 'dom-boyko',
     title: 'Усадьба купца Бойко',
     category: 'manor',
@@ -189,7 +182,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Коса', 'Купцы', 'XIX век'],
   },
   {
-    id: 'dom-kononova',
     slug: 'dom-kononova',
     title: 'Усадьба Кононова',
     category: 'manor',
@@ -210,7 +202,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Коса', 'Рыбопромышленники', 'Волга'],
   },
   {
-    id: 'kremlin-complex',
     slug: 'astrakhanskiy-kreml',
     title: 'Ансамбль Астраханского кремля',
     category: 'temple',
@@ -227,7 +218,6 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
     tags: ['Кремль', 'XVI век', 'Оборонное зодчество', 'Федеральный ОКН'],
   },
   {
-    id: 'tetyushinov-house',
     slug: 'dom-kuptsa-tetyushinova',
     title: 'Дом купца Г.В. Тетюшинова',
     category: 'wooden',
@@ -245,3 +235,9 @@ export const HERITAGE_OBJECTS: HeritageObject[] = [
   }
 ];
 
+export const OBJECT_FIXTURES: HeritageObject[] = RAW.map((o, i) => ({
+  ...o,
+  id: i + 1,
+  hasPanorama: (o.panoramas?.length ?? 0) > 0,
+  isPublished: true,
+}));

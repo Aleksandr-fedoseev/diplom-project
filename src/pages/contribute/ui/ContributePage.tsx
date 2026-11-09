@@ -1,28 +1,90 @@
 'use client';
 
-import React, { useId, useState } from 'react';
+import React, { Suspense, useId, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, CheckCircle2, Info, LogIn, Upload, UserCheck } from 'lucide-react';
-import { PageHeader } from '@/shared/ui';
-import { CATEGORY_OPTIONS, EMPTY_DRAFT, STEPS, type ObjectDraft } from '../model/draft';
-import { backClass, DraftInput, DraftSelect, DraftTextarea, Label, nextClass, submitClass } from './fields';
+import { useSearchParams } from 'next/navigation';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, ArrowRight, CheckCircle2, Info, LogIn } from 'lucide-react';
+import { useObject } from '@/entities/heritage-object';
+import { useSession } from '@/entities/session';
+import { isStaff } from '@/entities/user';
+import { submissionApi, submissionKeys } from '@/entities/submission';
+import { parseCoordinates } from '@/shared/lib';
+import { ErrorMessage, FileDrop, Loading, PageHeader } from '@/shared/ui';
+import { EMPTY_DRAFT, fileForm, MAX_FILE_MB, STEPS, toSubmissionInput, type ObjectDraft } from '../model/draft';
+import { backClass, DraftInput, DraftTextarea, Label, nextClass, submitClass } from './fields';
 import { Stepper } from './Stepper';
 
-export default function ContributePage() {
+function Contribute() {
+  // /contribute?object=birzha — дополнение к существующему объекту.
+  const objectSlug = useSearchParams()?.get('object') || undefined;
+  const target = useObject(objectSlug);
+  const { isAuthed, isLoading, user } = useSession();
+  const qc = useQueryClient();
   const [step, setStep] = useState(1);
   const [draft, setDraft] = useState<ObjectDraft>(EMPTY_DRAFT);
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const [progress, setProgress] = useState('');
   const id = useId();
   const set = (patch: Partial<ObjectDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
-  // Каждый шаг — своя форма: браузер проверит обязательные поля шага, прежде чем пустить дальше.
-  const onStepSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (step < STEPS.length) setStep(step + 1);
-    else setIsSubmitted(true);
-  };
+  // Сначала заявка, потом её файлы по одному. Если файл не принят, заявка уже создана —
+  // об этом сообщаем, а не делаем вид, что ничего не отправилось.
+  const submit = useMutation({
+    mutationFn: async () => {
+      const sub = await submissionApi.create(toSubmissionInput(draft, objectSlug));
+      const failed: string[] = [];
+      for (const [i, file] of files.entries()) {
+        setProgress(`Загрузка файла ${i + 1} из ${files.length}...`);
+        try {
+          await submissionApi.uploadMedia(sub.id, fileForm(file, draft));
+        } catch {
+          failed.push(file.name);
+        }
+      }
+      return { sub, failed };
+    },
+    onSettled: () => setProgress(''),
+    onSuccess: () => qc.invalidateQueries({ queryKey: submissionKeys.mine }),
+  });
 
-  if (isSubmitted) {
+  if (isLoading) return <Loading />;
+
+  if (!isAuthed) {
+    const next = `/contribute${objectSlug ? `?object=${encodeURIComponent(objectSlug)}` : ''}`;
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
+        <h1 className="text-2xl font-bold text-slate-900">Войдите, чтобы предложить материал</h1>
+        <p className="text-sm text-slate-600">
+          Заявка закрепляется за вашим аккаунтом: в личном кабинете видно, на каком она этапе, а о решении модератора
+          придёт письмо.
+        </p>
+        <Link
+          href={`/login?next=${encodeURIComponent(next)}`}
+          className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-lg font-semibold text-sm hover:bg-slate-800"
+        >
+          <LogIn className="w-4 h-4" />
+          <span>Войти или зарегистрироваться</span>
+        </Link>
+      </div>
+    );
+  }
+
+  // Сотрудник добавляет объекты сразу в каталог, без заявки самому себе.
+  if (isStaff(user?.role)) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
+        <h1 className="text-2xl font-bold text-slate-900">Заявки подают пользователи</h1>
+        <p className="text-sm text-slate-600">Сотрудник добавляет и правит объекты напрямую в разделе «Модерация».</p>
+        <Link href="/moderation?tab=objects" className="inline-flex px-6 py-3 bg-slate-900 text-white rounded-lg font-semibold text-sm hover:bg-slate-800">
+          Перейти к объектам
+        </Link>
+      </div>
+    );
+  }
+
+  if (submit.data) {
+    const { failed } = submit.data;
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-6">
         <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
@@ -30,21 +92,35 @@ export default function ContributePage() {
         </div>
         <h1 className="text-3xl font-bold text-slate-900">Материал успешно отправлен на модерацию</h1>
         <p className="text-slate-600 text-base leading-relaxed">
-          Спасибо за ваш вклад в сохранение культурного наследия Астрахани! Историки и архивисты Центра проверят
-          предоставленные данные в течение 1–3 рабочих дней.
+          Спасибо за ваш вклад в сохранение культурного наследия Астрахани! Модератор проверит данные, а о решении
+          придёт письмо на вашу почту.
         </p>
-        <div className="pt-4 flex justify-center">
+        {failed.length > 0 && (
+          <ErrorMessage error={new Error(`Не удалось загрузить: ${failed.join(', ')}. Заявка отправлена без этих файлов.`)} />
+        )}
+        <div className="pt-4 flex justify-center gap-3">
           <Link
-            href="/map"
+            href="/account?tab=submissions"
             className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-lg font-semibold text-sm hover:bg-slate-800 transition-colors"
           >
-            Перейти к интерактивной карте
+            Мои заявки
+          </Link>
+          <Link href="/map" className="inline-flex items-center px-6 py-3 bg-slate-100 rounded-lg font-semibold text-sm hover:bg-slate-200">
+            К карте
           </Link>
         </div>
       </div>
     );
   }
 
+  // Каждый шаг — своя форма: браузер проверит обязательные поля шага, прежде чем пустить дальше.
+  const onStepSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (step < STEPS.length) setStep(step + 1);
+    else submit.mutate();
+  };
+
+  const tooBig = files.filter((f) => f.size > MAX_FILE_MB * 1024 * 1024);
   const back = (
     <button type="button" onClick={() => setStep(step - 1)} className={backClass}>
       <ArrowLeft className="w-4 h-4" />
@@ -57,23 +133,13 @@ export default function ContributePage() {
       <PageHeader
         className="mb-6"
         kicker="Краудсорсинг архива"
-        title="Предложить объект или архивный снимок"
-        lead="Поделитесь информацией об утраченном или малоизвестном памятнике архитектуры."
+        title={target.data ? `Дополнить: ${target.data.title}` : 'Предложить объект или архивный снимок'}
+        lead={
+          target.data
+            ? 'Добавьте фотографии, архивные снимки или уточнения к объекту каталога.'
+            : 'Поделитесь информацией об утраченном или малоизвестном памятнике архитектуры.'
+        }
       />
-
-      <div className="mb-8 p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5 text-slate-700">
-          <UserCheck className="w-5 h-5 text-blue-600 shrink-0" />
-          <span>Вы можете подать заявку как зарегистрированный участник, чтобы закрепить авторство в реестре.</span>
-        </div>
-        <Link
-          href="/login"
-          className="px-3.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-semibold text-slate-800 transition-colors shrink-0 flex items-center justify-center gap-1.5"
-        >
-          <LogIn className="w-3.5 h-3.5" />
-          <span>Войти в профиль</span>
-        </Link>
-      </div>
 
       <Stepper step={step} />
 
@@ -81,28 +147,41 @@ export default function ContributePage() {
         {step === 1 && (
           <>
             <div>
-              <Label htmlFor={`${id}-title`}>Название объекта (историческое или народное)*</Label>
-              <DraftInput id={`${id}-title`} required autoFocus placeholder="Например: Дом купца Франгулова или Усадьба на Набережной" value={draft.title} onChange={(e) => set({ title: e.target.value })} />
+              <Label htmlFor={`${id}-title`}>{objectSlug ? 'Что вы добавляете*' : 'Название объекта (историческое или народное)*'}</Label>
+              <DraftInput
+                id={`${id}-title`}
+                required
+                autoFocus
+                placeholder={objectSlug ? 'Например: снимок фасада 1910-х годов' : 'Например: Дом купца Франгулова'}
+                value={draft.title}
+                onChange={(e) => set({ title: e.target.value })}
+              />
             </div>
+            {!objectSlug && (
+              <div>
+                <Label htmlFor={`${id}-address`}>Адрес или ориентир в Астрахани*</Label>
+                <DraftInput id={`${id}-address`} required placeholder="г. Астрахань, ул. Советская, д. ..." value={draft.address} onChange={(e) => set({ address: e.target.value })} />
+              </div>
+            )}
+            {!objectSlug && (
+              <div>
+                <Label htmlFor={`${id}-coords`}>Координаты (широта, долгота), если знаете</Label>
+                <DraftInput
+                  id={`${id}-coords`}
+                  placeholder="Например: 46.3538, 48.0285 — можно скопировать с карты"
+                  value={draft.coordinates}
+                  onChange={(e) => set({ coordinates: e.target.value })}
+                  onBlur={(e) =>
+                    e.target.setCustomValidity(
+                      e.target.value.trim() && !parseCoordinates(e.target.value) ? 'Два числа: широта и долгота, например 46.3538, 48.0285' : '',
+                    )
+                  }
+                />
+              </div>
+            )}
             <div>
-              <Label htmlFor={`${id}-address`}>Адрес или ориентир в Астрахани*</Label>
-              <DraftInput id={`${id}-address`} required placeholder="г. Астрахань, ул. Советская, д. ..." value={draft.address} onChange={(e) => set({ address: e.target.value })} />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor={`${id}-category`}>Категория</Label>
-                <DraftSelect id={`${id}-category`} value={draft.category} onChange={(e) => set({ category: e.target.value as ObjectDraft['category'] })}>
-                  {CATEGORY_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </DraftSelect>
-              </div>
-              <div>
-                <Label htmlFor={`${id}-year`}>Примерный год постройки</Label>
-                <DraftInput id={`${id}-year`} placeholder="Например: 1894 г. или конец XIX века" value={draft.yearBuilt} onChange={(e) => set({ yearBuilt: e.target.value })} />
-              </div>
+              <Label htmlFor={`${id}-period`}>Примерное время постройки</Label>
+              <DraftInput id={`${id}-period`} placeholder="Например: 1894 г. или конец XIX века" value={draft.period} onChange={(e) => set({ period: e.target.value })} />
             </div>
             <div className="pt-4 flex justify-end">
               <button type="submit" className={nextClass}>
@@ -120,13 +199,13 @@ export default function ContributePage() {
               <DraftTextarea id={`${id}-description`} rows={5} required autoFocus placeholder="Опишите историю здания, известных владельцев, особенности архитектуры..." value={draft.description} onChange={(e) => set({ description: e.target.value })} />
             </div>
             <div>
-              <Label htmlFor={`${id}-sources`}>Источники информации (архив, семейный архив, литература)</Label>
-              <DraftInput id={`${id}-sources`} placeholder="Например: ГАОО, фонд 12 или устные воспоминания" value={draft.sources} onChange={(e) => set({ sources: e.target.value })} />
+              <Label htmlFor={`${id}-source`}>Источники информации (архив, семейный архив, литература)</Label>
+              <DraftInput id={`${id}-source`} placeholder="Например: ГАОО, фонд 12 или устные воспоминания" value={draft.source} onChange={(e) => set({ source: e.target.value })} />
             </div>
             <div className="pt-4 flex justify-between">
               {back}
               <button type="submit" className={nextClass}>
-                <span>Далее: Загрузка медиа</span>
+                <span>Далее: Фотографии</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -135,41 +214,51 @@ export default function ContributePage() {
 
         {step === 3 && (
           <>
-            <div>
-              <span className="block text-sm font-semibold text-slate-900 mb-1.5">Загрузка фотографий и архивных сканов</span>
-              <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer">
-                <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-slate-700">Нажмите для выбора файлов или перетащите их сюда</p>
-                <p className="text-xs text-slate-400 mt-1">Поддерживаются JPG, PNG, WebP (до 25 МБ)</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FileDrop
+              title="Нажмите для выбора фотографий или перетащите их сюда"
+              hint={`JPG, PNG, WebP — до ${MAX_FILE_MB} МБ каждый`}
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              files={files}
+              onFiles={setFiles}
+            />
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={draft.archive} onChange={(e) => set({ archive: e.target.checked })} />
+              <span>Это архивные снимки</span>
+            </label>
+            {draft.archive && (
               <div>
-                <Label htmlFor={`${id}-name`}>Ваше имя (для указания авторства)*</Label>
-                <DraftInput id={`${id}-name`} required placeholder="Иван Петров" value={draft.authorName} onChange={(e) => set({ authorName: e.target.value })} />
+                <Label htmlFor={`${id}-year`}>Год съёмки</Label>
+                <DraftInput id={`${id}-year`} placeholder="Например: 1910 или 1910-е" value={draft.yearTaken} onChange={(e) => set({ yearTaken: e.target.value })} />
               </div>
-              <div>
-                <Label htmlFor={`${id}-email`}>Контактный Email (для обратной связи)*</Label>
-                <DraftInput id={`${id}-email`} type="email" required placeholder="Ваш e-mail" value={draft.authorEmail} onChange={(e) => set({ authorEmail: e.target.value })} />
-              </div>
-            </div>
+            )}
+            {tooBig.length > 0 && <ErrorMessage error={new Error(`Больше ${MAX_FILE_MB} МБ: ${tooBig.map((f) => f.name).join(', ')}`)} />}
             <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-500 flex items-start gap-2">
               <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
               <span>
-                Отправляя данные, вы подтверждаете согласие на их научную проверку и публикацию в открытом архиве
-                платформы с сохранением вашего авторства.
+                Отправляя данные, вы подтверждаете, что имеете право передать снимки, и соглашаетесь на их научную
+                проверку и публикацию на платформе с указанием вашего авторства.
               </span>
             </div>
+            {submit.error && <ErrorMessage error={submit.error} />}
             <div className="pt-4 flex justify-between">
               {back}
-              <button type="submit" className={submitClass}>
+              <button type="submit" disabled={submit.isPending || tooBig.length > 0} className={submitClass}>
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Отправить на модерацию</span>
+                <span>{submit.isPending ? progress || 'Отправка...' : 'Отправить на модерацию'}</span>
               </button>
             </div>
           </>
         )}
       </form>
     </div>
+  );
+}
+
+export default function ContributePage() {
+  return (
+    <Suspense>
+      <Contribute />
+    </Suspense>
   );
 }

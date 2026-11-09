@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HERITAGE_OBJECTS } from '@/entities/heritage-object';
+import { OBJECT_FIXTURES as HERITAGE_OBJECTS } from '@/entities/heritage-object/testing';
 import { escapeHtml, markerHtml } from './marker';
 
 describe('markerHtml', () => {

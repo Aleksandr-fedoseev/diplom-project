@@ -2,7 +2,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import { findObjectBySlug } from '@/entities/heritage-object';
 import { findStoryBySlug, relatedStories, StoryBlocks } from '@/entities/story';
 import { RelatedObjects } from './RelatedObjects';
 import { RelatedStories } from './RelatedStories';
@@ -19,7 +18,6 @@ export default async function StoryPage({ params }: StoryPageProps) {
   const story = findStoryBySlug(slug);
   if (!story) notFound();
 
-  const objects = (story.relatedObjectSlugs ?? []).flatMap((s) => findObjectBySlug(s) ?? []);
   const related = relatedStories(story);
 
   return (
@@ -48,7 +46,7 @@ export default async function StoryPage({ params }: StoryPageProps) {
       <StoryBlocks blocks={story.blocks} />
 
       {story.mapCoordinates && <StoryMapSection place={story.mapCoordinates} objectSlug={story.relatedObjectSlugs?.[0]} />}
-      {objects.length > 0 && <RelatedObjects objects={objects} />}
+      {story.relatedObjectSlugs?.length ? <RelatedObjects slugs={story.relatedObjectSlugs} /> : null}
       <StorySources sources={story.sources} />
       {related.length > 0 && <RelatedStories stories={related} />}
     </article>

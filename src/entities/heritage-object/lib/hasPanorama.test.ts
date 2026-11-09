@@ -1,23 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { HERITAGE_OBJECTS } from '../model/data';
+import { OBJECT_FIXTURES } from '../model/fixtures';
 import { hasPanorama } from './hasPanorama';
 
 describe('hasPanorama', () => {
-  const base = HERITAGE_OBJECTS[0];
+  const base = { ...OBJECT_FIXTURES[0], hasPanorama: false };
 
-  it('нет списка панорам — нет панорамы', () => {
+  it('нет признака и панорам — false', () => {
     expect(hasPanorama({ ...base, panoramas: undefined })).toBe(false);
-  });
-
-  it('пустой список — нет панорамы', () => {
     expect(hasPanorama({ ...base, panoramas: [] })).toBe(false);
   });
 
-  it('есть хотя бы одна панорама', () => {
+  it('признак из списка API — true', () => {
+    expect(hasPanorama({ ...base, hasPanorama: true })).toBe(true);
+  });
+
+  it('есть панорамы в карточке — true', () => {
     expect(hasPanorama({ ...base, panoramas: [{ url: '/p.jpg', source: 'photo', caption: 'Вид' }] })).toBe(true);
   });
 
-  it('значок 360° сейчас только у дома Кононова', () => {
-    expect(HERITAGE_OBJECTS.filter(hasPanorama).map((o) => o.slug)).toEqual(['dom-kononova']);
+  it('в данных прототипа панорама только у дома Кононова', () => {
+    expect(OBJECT_FIXTURES.filter(hasPanorama).map((o) => o.slug)).toEqual(['dom-kononova']);
   });
 });

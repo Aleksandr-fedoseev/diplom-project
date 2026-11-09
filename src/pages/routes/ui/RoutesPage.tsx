@@ -1,17 +1,20 @@
+'use client';
+
 import Link from 'next/link';
 import { Compass } from 'lucide-react';
-import { ROUTES, routeStops, type RouteItem } from '@/entities/route';
+import { useQuery } from '@tanstack/react-query';
+import { formatDistance, formatDuration, routeApi, routeKeys, type RouteItem } from '@/entities/route';
 import { plural } from '@/shared/lib';
-import { PageHeader } from '@/shared/ui';
+import { PageHeader, QueryState } from '@/shared/ui';
 
 function RouteCard({ route }: { route: RouteItem }) {
-  const stops = routeStops(route);
+  const { stops } = route;
   return (
     <article id={route.slug} className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs hover:shadow-md transition-all space-y-4">
       <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-500">
-        <span className="px-2.5 py-1 bg-slate-100 rounded text-slate-800">Время: {route.duration}</span>
+        <span className="px-2.5 py-1 bg-slate-100 rounded text-slate-800">Время: {formatDuration(route.durationS)}</span>
         <span>•</span>
-        <span className="px-2.5 py-1 bg-slate-100 rounded text-slate-800">Дистанция: {route.distance}</span>
+        <span className="px-2.5 py-1 bg-slate-100 rounded text-slate-800">Дистанция: {formatDistance(route.distanceM)}</span>
         <span>•</span>
         <span>
           {stops.length} {plural(stops.length, ['ключевой объект', 'ключевых объекта', 'ключевых объектов'])}
@@ -27,7 +30,7 @@ function RouteCard({ route }: { route: RouteItem }) {
         </h3>
         <ol className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {stops.map((obj, idx) => (
-            <li key={obj.id}>
+            <li key={obj.position}>
               <Link
                 href={`/objects/${obj.slug}`}
                 className="flex items-center gap-2.5 p-3 rounded-lg bg-slate-50 hover:bg-blue-50 hover:text-blue-700 transition-colors border border-slate-200 text-xs font-medium text-slate-800"
@@ -56,6 +59,7 @@ function RouteCard({ route }: { route: RouteItem }) {
 }
 
 export default function RoutesPage() {
+  const routes = useQuery({ queryKey: routeKeys.thematic, queryFn: routeApi.thematic });
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 w-full">
       <PageHeader
@@ -64,11 +68,19 @@ export default function RoutesPage() {
         title="Историко-архитектурные маршруты"
         lead="Пешеходные экскурсии по историческому центру Астрахани с точными координатами памятников на карте OpenStreetMap."
       />
-      <div className="space-y-6">
-        {ROUTES.map((route) => (
-          <RouteCard key={route.id} route={route} />
-        ))}
-      </div>
+      <QueryState query={routes} loadingLabel="Загрузка маршрутов...">
+        {(list) =>
+          list.length === 0 ? (
+            <p className="py-16 text-center text-sm text-slate-500">Маршруты пока не добавлены.</p>
+          ) : (
+            <div className="space-y-6">
+              {list.map((route) => (
+                <RouteCard key={route.id} route={route} />
+              ))}
+            </div>
+          )
+        }
+      </QueryState>
     </div>
   );
 }

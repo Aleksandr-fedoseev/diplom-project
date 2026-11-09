@@ -1,9 +1,15 @@
+'use client';
+
 import Link from 'next/link';
 import { MapPin } from 'lucide-react';
-import { ObjectCover, objectMapHref, type HeritageObject } from '@/entities/heritage-object';
+import { ObjectCover, objectMapHref, useObjects } from '@/entities/heritage-object';
 
-// Объекты карты, о которых говорится в статье (ТЗ 5.2).
-export function RelatedObjects({ objects }: { objects: HeritageObject[] }) {
+// Объекты карты, о которых говорится в статье (ТЗ 5.2). Статьи — статичный контент,
+// объекты — из каталога API; объект, которого нет в каталоге, просто не показывается.
+export function RelatedObjects({ slugs }: { slugs: string[] }) {
+  const { data } = useObjects();
+  const objects = slugs.flatMap((s) => data?.find((o) => o.slug === s) ?? []);
+  if (objects.length === 0) return null;
   return (
     <section className="mt-12 p-6 sm:p-8 bg-slate-50 border border-slate-200 rounded-3xl space-y-4">
       <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-950">
@@ -19,7 +25,7 @@ export function RelatedObjects({ objects }: { objects: HeritageObject[] }) {
           >
             <ObjectCover object={obj} className="w-16 h-16 rounded-xl shrink-0" />
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-bold text-blue-600 uppercase">{obj.yearBuilt} г.</span>
+              <span className="text-[10px] font-bold text-blue-600 uppercase">{obj.yearBuilt && `${obj.yearBuilt} г.`}</span>
               <h3 className="text-sm font-bold text-slate-950 group-hover:text-blue-600 transition-colors truncate">
                 {obj.title}
               </h3>

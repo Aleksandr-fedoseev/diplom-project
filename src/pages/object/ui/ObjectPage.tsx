@@ -3,20 +3,29 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { notFound, useParams } from 'next/navigation';
+import { ApiError } from '@/shared/api';
 import { ArrowLeft, Eye, FileText, MapPin, Share2 } from 'lucide-react';
-import { findObjectBySlug, hasPanorama, ObjectTags, ProtectionBadge } from '@/entities/heritage-object';
+import { hasPanorama, ObjectTags, ProtectionBadge, useObject } from '@/entities/heritage-object';
 import { PanoramaViewer } from '@/entities/panorama';
-import { Tabs } from '@/shared/ui';
+import { ErrorMessage, Loading, Tabs } from '@/shared/ui';
 import { ObjectFacts } from './ObjectFacts';
 
 type ObjectTab = 'passport' | 'panorama';
 
 export default function ObjectPage() {
   const slug = useParams<{ slug: string }>()?.slug ?? '';
-  const object = findObjectBySlug(slug);
+  const card = useObject(slug);
   const [tab, setTab] = useState<ObjectTab>('passport');
 
-  if (!object) notFound();
+  if (card.error instanceof ApiError && card.error.status === 404) notFound();
+  if (card.error)
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        <ErrorMessage error={card.error} onRetry={() => card.refetch()} />
+      </div>
+    );
+  if (!card.data) return <Loading label="Загрузка паспорта объекта..." />;
+  const object = card.data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full">
@@ -91,7 +100,9 @@ export default function ObjectPage() {
             <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
               <section>
                 <h2 className="text-xl font-bold text-slate-900 mb-3">Архитектурно-историческое описание</h2>
-                <p className="text-base text-slate-700 leading-relaxed">{object.fullHistory}</p>
+                <p className="text-base text-slate-700 leading-relaxed">
+                  {object.fullHistory || 'Историческая справка пока не добавлена.'}
+                </p>
               </section>
               <section className="pt-4 border-t border-slate-100">
                 <h3 className="text-base font-bold text-slate-900 mb-2">Краткая характеристика</h3>

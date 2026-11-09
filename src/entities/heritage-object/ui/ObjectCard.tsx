@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Eye, MapPin } from 'lucide-react';
 import { hasPanorama } from '../lib/hasPanorama';
-import { objectMapHref } from '../lib/object';
+import { objectMapHref, objectSubtitle } from '../lib/object';
 import type { HeritageObject } from '../model/types';
 import { ObjectCover } from './ObjectCover';
 import { ProtectionBadge } from './ProtectionBadge';
@@ -30,7 +30,7 @@ export function ObjectCard({ object }: { object: HeritageObject }) {
 
         <div className="p-5">
           <div className="text-[11px] font-semibold text-blue-600 uppercase mb-2">
-            {object.yearBuilt} г. • {object.architecturalStyle}
+            {objectSubtitle(object)}
           </div>
           <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors mb-1.5 leading-snug">
             {object.title}

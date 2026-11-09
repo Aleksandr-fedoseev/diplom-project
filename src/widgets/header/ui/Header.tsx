@@ -3,10 +3,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Heart, Menu, Search, User, X } from 'lucide-react';
+import { Heart, Menu, Search, X } from 'lucide-react';
 import { cn } from '@/shared/lib';
-import { isActiveLink, NAV_LINKS } from '../model/nav';
+import { useSession } from '@/entities/session';
+import { isActiveLink, NAV_LINKS, staffLinks } from '../model/nav';
 import { SiteSearch } from './SiteSearch';
+import { ThemeToggle } from './ThemeToggle';
+import { UserMenu } from './UserMenu';
 
 const iconButton = 'p-2 text-slate-600 hover:text-slate-950 hover:bg-slate-100 rounded-lg transition-colors';
 
@@ -14,6 +17,7 @@ export default function Header() {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const staff = staffLinks(useSession().user?.role);
 
   // Переход на другую страницу закрывает меню и поиск.
   useEffect(() => {
@@ -51,6 +55,23 @@ export default function Header() {
                 </Link>
               );
             })}
+            {staff.length > 0 && <span className="w-px h-6 bg-slate-200 mx-1" aria-hidden />}
+            {staff.map((link) => {
+              const active = isActiveLink(link.href, pathname);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'px-3 py-2 rounded-lg text-sm font-bold transition-colors',
+                    active ? 'bg-blue-600 text-white' : 'text-blue-700 bg-blue-50 hover:bg-blue-100',
+                  )}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
@@ -63,9 +84,8 @@ export default function Header() {
             >
               <Search className="w-5 h-5" />
             </button>
-            <Link href="/login" className={iconButton} aria-label="Личный кабинет">
-              <User className="w-5 h-5" />
-            </Link>
+            <ThemeToggle />
+            <UserMenu />
             <Link
               href="/support"
               className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 bg-slate-950 hover:bg-slate-800 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors shadow-xs"
@@ -96,6 +116,16 @@ export default function Header() {
               href={link.href}
               aria-current={isActiveLink(link.href, pathname) ? 'page' : undefined}
               className="flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-800 font-semibold text-base hover:bg-slate-100"
+            >
+              {link.label}
+            </Link>
+          ))}
+          {staff.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-current={isActiveLink(link.href, pathname) ? 'page' : undefined}
+              className="flex items-center justify-between px-3 py-2.5 rounded-lg text-blue-700 bg-blue-50 font-bold text-base"
             >
               {link.label}
             </Link>

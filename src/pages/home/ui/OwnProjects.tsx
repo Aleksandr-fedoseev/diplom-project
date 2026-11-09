@@ -8,25 +8,25 @@ export function OwnProjects() {
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
       <SectionHeading kicker="Инициативы фонда" title="Собственные проекты" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-slate-950 text-white rounded-3xl p-8 flex flex-col justify-between overflow-hidden relative group shadow-md">
+        <div className="bg-ink-950 text-snow rounded-3xl p-8 flex flex-col justify-between overflow-hidden relative group shadow-md">
           <div
             className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:scale-105 transition-transform duration-500"
             style={{ backgroundImage: 'url(/heritage/birzha/cover.jpg)' }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/70 to-transparent" />
           <div className="relative z-10 space-y-2">
-            <span className="px-2.5 py-0.5 bg-white/20 backdrop-blur-md rounded text-[10px] font-bold uppercase tracking-wider text-white">
+            <span className="px-2.5 py-0.5 bg-snow/20 backdrop-blur-md rounded text-[10px] font-bold uppercase tracking-wider text-snow">
               Проект №1
             </span>
-            <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white">Интерактивная карта наследия</h3>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+            <h3 className="text-xl sm:text-2xl font-black tracking-tight text-snow">Интерактивная карта наследия</h3>
+            <p className="text-xs sm:text-sm text-ink-300 leading-relaxed">
               Каталог архитектурных памятников Астрахани с архивными фото и описаниями на карте города.
             </p>
           </div>
           <div className="relative z-10 pt-6 flex items-center">
             <Link
               href="/map"
-              className="inline-flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-100 text-slate-950 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-sm"
+              className="inline-flex items-center gap-2 px-5 py-3 bg-snow hover:bg-ink-100 text-ink-950 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-sm"
             >
               <Compass className="w-4 h-4" />
               <span>Открыть карту</span>

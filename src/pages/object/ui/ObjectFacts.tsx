@@ -5,7 +5,7 @@ import { formatCoordinates, objectMapHref, type HeritageObject } from '@/entitie
 // Паспортные реквизиты объекта в боковой колонке.
 export function ObjectFacts({ object }: { object: HeritageObject }) {
   const facts: [string, string | undefined][] = [
-    ['Период постройки', `${object.yearBuilt} г.`],
+    ['Период постройки', object.yearBuilt && `${object.yearBuilt} г.`],
     ['Архитектурный стиль', object.architecturalStyle],
     ['Архитектор / Зодчий', object.architect],
     ['Адрес объекта', object.address],
@@ -37,6 +37,12 @@ export function ObjectFacts({ object }: { object: HeritageObject }) {
         >
           <MapPin className="w-4 h-4 text-blue-400" />
           <span>Показать на интерактивной карте</span>
+        </Link>
+        <Link
+          href={`/contribute?object=${encodeURIComponent(object.slug)}`}
+          className="mt-2 w-full inline-flex items-center justify-center py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold transition-colors"
+        >
+          Дополнить: фото, архив, уточнения
         </Link>
       </div>
     </div>

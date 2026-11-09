@@ -7,6 +7,7 @@ import {
   ObjectCover,
   ObjectTags,
   ProtectionBadge,
+  useObject,
   type HeritageObject,
 } from '@/entities/heritage-object';
 import { PanoramaViewer } from '@/entities/panorama';
@@ -21,8 +22,11 @@ interface ObjectDrawerProps {
 }
 
 // Панель объекта поверх карты: описание, панорама, статьи об объекте.
-export default function ObjectDrawer({ object, onClose }: ObjectDrawerProps) {
+export default function ObjectDrawer({ object: listItem, onClose }: ObjectDrawerProps) {
   const [tab, setTab] = useState<DrawerTab>('info');
+  // В списке нет полной истории и панорам — догружаем карточку, пока показываем то, что есть.
+  const card = useObject(listItem.slug);
+  const object = card.data ?? listItem;
   const stories = storiesAboutObject(object.slug);
 
   return (
@@ -37,7 +41,7 @@ export default function ObjectDrawer({ object, onClose }: ObjectDrawerProps) {
               status={object.protectionStatus}
               className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5"
             />
-            <span className="text-[11px] font-semibold text-slate-500">{object.yearBuilt} г.</span>
+            {object.yearBuilt && <span className="text-[11px] font-semibold text-slate-500">{object.yearBuilt} г.</span>}
           </div>
           <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">{object.title}</h2>
           <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
@@ -78,7 +82,7 @@ export default function ObjectDrawer({ object, onClose }: ObjectDrawerProps) {
             <dl className="grid grid-cols-2 gap-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
               <div>
                 <dt className="text-slate-400 mb-0.5">Стиль:</dt>
-                <dd className="font-semibold text-slate-900">{object.architecturalStyle}</dd>
+                <dd className="font-semibold text-slate-900">{object.architecturalStyle || "—"}</dd>
               </div>
               {object.architect && (
                 <div>
@@ -90,7 +94,9 @@ export default function ObjectDrawer({ object, onClose }: ObjectDrawerProps) {
 
             <section>
               <h3 className="text-sm font-bold text-slate-900 mb-1.5">Историческая справка</h3>
-              <p className="text-sm text-slate-700 leading-relaxed">{object.fullHistory}</p>
+              <p className="text-sm text-slate-700 leading-relaxed">
+                {object.fullHistory || (card.isPending ? 'Загрузка...' : 'Историческая справка пока не добавлена.')}
+              </p>
             </section>
 
             <section>

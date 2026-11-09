@@ -1,8 +1,10 @@
-export type { HeritageObject, HeritageCategory, ProtectionStatus } from './model/types';
-export { HERITAGE_OBJECTS } from './model/data';
+export type { HeritageObject, HeritageCategory, ObjectFile, ProtectionStatus } from './model/types';
+export type { CategoryDto, MediaFileDto, ObjectInput } from './api/dto';
+export { objectApi, objectKeys } from './api/objectApi';
+export { useCategories, useObject, useObjects } from './api/queries';
 export { CATEGORY_LABELS, PROTECTION_LABELS } from './model/labels';
 export { hasPanorama } from './lib/hasPanorama';
-export { findObjectBySlug, formatCoordinates, objectMapHref } from './lib/object';
+export { formatCoordinates, objectMapHref } from './lib/object';
 export { ObjectCard } from './ui/ObjectCard';
 export { ObjectCover } from './ui/ObjectCover';
 export { ObjectListItem } from './ui/ObjectListItem';
