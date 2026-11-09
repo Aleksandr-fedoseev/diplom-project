@@ -84,12 +84,26 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	ids := make([]int64, len(objects))
+	for i, o := range objects {
+		ids[i] = o.ID
+	}
+	previews, err := h.media.Previews(r.Context(), ids)
+	if err != nil {
+		return err
+	}
 	out := make([]objectResponse, len(objects))
 	for i, o := range objects {
-		out[i] = toObjectResponse(o)
+		out[i] = withPreview(toObjectResponse(o), previews[o.ID])
 	}
 	httpx.JSON(w, http.StatusOK, out)
 	return nil
+}
+
+func withPreview(o objectResponse, p media.Preview) objectResponse {
+	o.CoverURL = p.CoverURL()
+	o.HasPanorama = p.HasPanorama
+	return o
 }
 
 // parseFilter разбирает параметры списка. Здесь только формат; что из этого разрешено, решает сервис.
@@ -147,7 +161,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	httpx.JSON(w, http.StatusOK, cardResponse{Object: toObjectResponse(o), Media: mediahttp.ToFileResponses(files)})
+	httpx.JSON(w, http.StatusOK, cardResponse{Object: withPreview(toObjectResponse(o), media.PreviewOf(files)), Media: mediahttp.ToFileResponses(files)})
 	return nil
 }
 

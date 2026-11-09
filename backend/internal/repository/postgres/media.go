@@ -120,6 +120,21 @@ func (r *Media) ListBySubmission(ctx context.Context, submissionID int64) ([]med
 	return toFiles(rows), nil
 }
 
+func (r *Media) Previews(ctx context.Context, objectIDs []int64) (map[int64]media.Preview, error) {
+	out := make(map[int64]media.Preview)
+	if len(objectIDs) == 0 {
+		return out, nil
+	}
+	rows, err := queries(ctx, r.pool).ListObjectPreviews(ctx, objectIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ObjectID] = media.Preview{CoverID: row.CoverID, HasPanorama: row.HasPanorama}
+	}
+	return out, nil
+}
+
 func (r *Media) AttachToObject(ctx context.Context, submissionID, objectID int64) error {
 	return queries(ctx, r.pool).AttachMediaFilesToObject(ctx, sqlc.AttachMediaFilesToObjectParams{
 		ObjectID: &objectID, SubmissionID: &submissionID,

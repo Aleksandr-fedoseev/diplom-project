@@ -26,11 +26,24 @@ type userResponse struct {
 	Name      string    `json:"name"`
 	Role      string    `json:"role"`
 	IsBlocked bool      `json:"isBlocked"`
+	AvatarURL string    `json:"avatarUrl"` // пусто — аватара нет
 	CreatedAt time.Time `json:"createdAt"`
 }
 
 func toUserResponse(u auth.User) userResponse {
-	return userResponse{ID: u.ID, Email: u.Email, Name: u.Name, Role: string(u.Role), IsBlocked: u.IsBlocked, CreatedAt: u.CreatedAt}
+	return userResponse{
+		ID: u.ID, Email: u.Email, Name: u.Name, Role: string(u.Role), IsBlocked: u.IsBlocked,
+		AvatarURL: u.AvatarURL(), CreatedAt: u.CreatedAt,
+	}
+}
+
+type profileRequest struct {
+	Name string `json:"name"`
+}
+
+type passwordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
 }
 
 type loginResponse struct {

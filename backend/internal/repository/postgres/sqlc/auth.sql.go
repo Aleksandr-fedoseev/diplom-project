@@ -13,7 +13,7 @@ const createUser = `-- name: CreateUser :one
 
 INSERT INTO auth.users (email, password_hash, name, role)
 VALUES ($1, $2, $3, $4)
-RETURNING id, email, password_hash, name, role, is_blocked, created_at
+RETURNING id, email, password_hash, name, role, is_blocked, created_at, avatar_key
 `
 
 type CreateUserParams struct {
@@ -40,12 +40,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Role,
 		&i.IsBlocked,
 		&i.CreatedAt,
+		&i.AvatarKey,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, name, role, is_blocked, created_at FROM auth.users WHERE email = $1
+SELECT id, email, password_hash, name, role, is_blocked, created_at, avatar_key FROM auth.users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -59,12 +60,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Role,
 		&i.IsBlocked,
 		&i.CreatedAt,
+		&i.AvatarKey,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, name, role, is_blocked, created_at FROM auth.users WHERE id = $1
+SELECT id, email, password_hash, name, role, is_blocked, created_at, avatar_key FROM auth.users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
@@ -78,12 +80,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 		&i.Role,
 		&i.IsBlocked,
 		&i.CreatedAt,
+		&i.AvatarKey,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, password_hash, name, role, is_blocked, created_at FROM auth.users ORDER BY id LIMIT $1 OFFSET $2
+SELECT id, email, password_hash, name, role, is_blocked, created_at, avatar_key FROM auth.users ORDER BY id LIMIT $1 OFFSET $2
 `
 
 type ListUsersParams struct {
@@ -108,6 +111,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.Role,
 			&i.IsBlocked,
 			&i.CreatedAt,
+			&i.AvatarKey,
 		); err != nil {
 			return nil, err
 		}
@@ -119,8 +123,33 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 	return items, nil
 }
 
+const setUserAvatar = `-- name: SetUserAvatar :one
+UPDATE auth.users SET avatar_key = $1 WHERE id = $2 RETURNING id, email, password_hash, name, role, is_blocked, created_at, avatar_key
+`
+
+type SetUserAvatarParams struct {
+	AvatarKey *string
+	ID        int64
+}
+
+func (q *Queries) SetUserAvatar(ctx context.Context, arg SetUserAvatarParams) (User, error) {
+	row := q.db.QueryRow(ctx, setUserAvatar, arg.AvatarKey, arg.ID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Name,
+		&i.Role,
+		&i.IsBlocked,
+		&i.CreatedAt,
+		&i.AvatarKey,
+	)
+	return i, err
+}
+
 const setUserBlocked = `-- name: SetUserBlocked :one
-UPDATE auth.users SET is_blocked = $2 WHERE id = $1 RETURNING id, email, password_hash, name, role, is_blocked, created_at
+UPDATE auth.users SET is_blocked = $2 WHERE id = $1 RETURNING id, email, password_hash, name, role, is_blocked, created_at, avatar_key
 `
 
 type SetUserBlockedParams struct {
@@ -139,12 +168,13 @@ func (q *Queries) SetUserBlocked(ctx context.Context, arg SetUserBlockedParams) 
 		&i.Role,
 		&i.IsBlocked,
 		&i.CreatedAt,
+		&i.AvatarKey,
 	)
 	return i, err
 }
 
 const setUserRole = `-- name: SetUserRole :one
-UPDATE auth.users SET role = $2 WHERE id = $1 RETURNING id, email, password_hash, name, role, is_blocked, created_at
+UPDATE auth.users SET role = $2 WHERE id = $1 RETURNING id, email, password_hash, name, role, is_blocked, created_at, avatar_key
 `
 
 type SetUserRoleParams struct {
@@ -163,6 +193,49 @@ func (q *Queries) SetUserRole(ctx context.Context, arg SetUserRoleParams) (User,
 		&i.Role,
 		&i.IsBlocked,
 		&i.CreatedAt,
+		&i.AvatarKey,
 	)
 	return i, err
+}
+
+const updateUserName = `-- name: UpdateUserName :one
+UPDATE auth.users SET name = $2 WHERE id = $1 RETURNING id, email, password_hash, name, role, is_blocked, created_at, avatar_key
+`
+
+type UpdateUserNameParams struct {
+	ID   int64
+	Name string
+}
+
+func (q *Queries) UpdateUserName(ctx context.Context, arg UpdateUserNameParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserName, arg.ID, arg.Name)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Name,
+		&i.Role,
+		&i.IsBlocked,
+		&i.CreatedAt,
+		&i.AvatarKey,
+	)
+	return i, err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :execrows
+UPDATE auth.users SET password_hash = $2 WHERE id = $1
+`
+
+type UpdateUserPasswordParams struct {
+	ID           int64
+	PasswordHash string
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateUserPassword, arg.ID, arg.PasswordHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

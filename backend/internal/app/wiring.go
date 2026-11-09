@@ -35,9 +35,15 @@ func (a *App) wire(ctx context.Context) (http.Handler, error) {
 	tx := postgres.NewTxManager(db)
 	events := outbox.NewPublisher(db) // события пишутся в транзакции сервиса
 
-	// Пользователи: bcrypt и JWT подставляются через порты сервиса.
+	// S3-хранилище файлов: медиафайлы объектов и аватары пользователей.
+	storage, err := s3.New(ctx, cfg.MinIOEndpoint, cfg.MinIOAccessKey, cfg.MinIOSecretKey, cfg.MinIOBucket, cfg.MinIOUseSSL)
+	if err != nil {
+		return nil, err
+	}
+
+	// Пользователи: bcrypt, JWT и хранилище аватаров подставляются через порты сервиса.
 	authService := authsvc.NewService(repo.NewUsers(db), security.BcryptHasher{},
-		security.NewJWTIssuer(cfg.JWTSecret, cfg.JWTTTL))
+		security.NewJWTIssuer(cfg.JWTSecret, cfg.JWTTTL), storage)
 	if err := authService.EnsureAdmin(ctx, cfg.AdminEmail, cfg.AdminPassword); err != nil {
 		return nil, err
 	}
@@ -45,10 +51,6 @@ func (a *App) wire(ctx context.Context) (http.Handler, error) {
 	// Каталог — владелец объектов; остальные модули получают сведения об объектах через него.
 	catalogService := catalogsvc.NewService(repo.NewObjects(db), repo.NewCategories(db))
 
-	storage, err := s3.New(ctx, cfg.MinIOEndpoint, cfg.MinIOAccessKey, cfg.MinIOSecretKey, cfg.MinIOBucket, cfg.MinIOUseSSL)
-	if err != nil {
-		return nil, err
-	}
 	mediaService := mediasvc.NewService(repo.NewMedia(db), storage, catalogService, cfg.MaxUploadMB)
 	mediaHandler := mediahttp.NewHandler(mediaService)
 

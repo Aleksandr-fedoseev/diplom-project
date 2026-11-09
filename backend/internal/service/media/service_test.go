@@ -44,6 +44,9 @@ func (r *fakeRepo) ByID(_ context.Context, id int64) (media.File, error) {
 
 func (r *fakeRepo) ListByObject(context.Context, int64) ([]media.File, error)     { return nil, nil }
 func (r *fakeRepo) ListBySubmission(context.Context, int64) ([]media.File, error) { return nil, nil }
+func (r *fakeRepo) Previews(context.Context, []int64) (map[int64]media.Preview, error) {
+	return nil, nil
+}
 
 func (r *fakeRepo) AttachToObject(_ context.Context, submissionID, objectID int64) error {
 	r.attached[submissionID] = objectID

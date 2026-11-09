@@ -27,3 +27,14 @@ UPDATE media.media_files SET object_id = sqlc.arg(object_id) WHERE submission_id
 
 -- name: DeleteMediaFile :execrows
 DELETE FROM media.media_files WHERE id = $1;
+
+-- Сводка для списка объектов: обложка (первое современное фото, иначе архивное) и есть ли
+-- панорама. cover_id = 0 — у объекта нет фотографий.
+-- name: ListObjectPreviews :many
+SELECT object_id::bigint AS object_id,
+       COALESCE((array_agg(id ORDER BY (kind = 'photo') DESC, id)
+                 FILTER (WHERE kind IN ('photo', 'archive_photo')))[1], 0)::bigint AS cover_id,
+       bool_or(kind = 'panorama')::boolean AS has_panorama
+FROM media.media_files
+WHERE object_id = ANY(sqlc.arg(object_ids)::bigint[])
+GROUP BY object_id;

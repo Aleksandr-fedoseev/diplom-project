@@ -12,6 +12,7 @@ type Service interface {
 	Upload(ctx context.Context, in UploadInput) (File, error)
 	ListByObject(ctx context.Context, objectID int64) ([]File, error)
 	ListBySubmission(ctx context.Context, submissionID int64) ([]File, error)
+	Previews(ctx context.Context, objectIDs []int64) (map[int64]Preview, error)
 	// Open возвращает файл и поток его содержимого. Поток умеет Seek, поэтому HTTP может
 	// отдавать файл частями (Range). Файл, который v видеть не положено, — ErrFileNotFound.
 	// Поток закрывает вызывающий.

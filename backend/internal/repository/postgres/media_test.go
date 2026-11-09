@@ -103,6 +103,12 @@ func TestMediaRepository(t *testing.T) {
 		t.Fatalf("файлы объекта: %+v", byObject)
 	}
 
+	// Сводка из SQL совпадает с правилом домена.
+	previews, err := files.Previews(ctx, []int64{objectID})
+	if err != nil || previews[objectID] != media.PreviewOf(byObject) || !previews[objectID].HasPanorama {
+		t.Fatalf("сводка объекта: %+v, %v", previews, err)
+	}
+
 	for _, f := range []media.File{pano, photo} {
 		if err := files.Delete(ctx, f.ID); err != nil {
 			t.Fatal(err)

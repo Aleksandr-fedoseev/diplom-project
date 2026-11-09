@@ -120,6 +120,10 @@ func (s *Service) ListBySubmission(ctx context.Context, submissionID int64) ([]m
 	return s.repo.ListBySubmission(ctx, submissionID)
 }
 
+func (s *Service) Previews(ctx context.Context, objectIDs []int64) (map[int64]media.Preview, error) {
+	return s.repo.Previews(ctx, objectIDs)
+}
+
 func (s *Service) Open(ctx context.Context, id int64, v media.Viewer) (media.File, io.ReadSeekCloser, error) {
 	f, err := s.repo.ByID(ctx, id)
 	if err != nil {

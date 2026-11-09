@@ -25,6 +25,7 @@ type fakeCatalog struct {
 	objects         map[string]catalog.Object
 	lastFilter      catalog.Filter
 	lastViewer      catalog.Viewer
+	listResult      []catalog.Object
 }
 
 func (c *fakeCatalog) GetVisible(_ context.Context, slug string, v catalog.Viewer) (catalog.Object, error) {
@@ -37,7 +38,7 @@ func (c *fakeCatalog) GetVisible(_ context.Context, slug string, v catalog.Viewe
 
 func (c *fakeCatalog) List(_ context.Context, f catalog.Filter, v catalog.Viewer) ([]catalog.Object, error) {
 	c.lastFilter, c.lastViewer = f, v
-	return nil, nil
+	return c.listResult, nil
 }
 
 type fakeMedia struct {
@@ -47,7 +48,10 @@ type fakeMedia struct {
 }
 
 func (m *fakeMedia) ListByObject(context.Context, int64) ([]media.File, error) { return nil, nil }
-func (m *fakeMedia) MaxUploadBytes() int64                                     { return 10 * media.MB }
+func (m *fakeMedia) Previews(context.Context, []int64) (map[int64]media.Preview, error) {
+	return map[int64]media.Preview{1: {CoverID: 9, HasPanorama: true}}, nil
+}
+func (m *fakeMedia) MaxUploadBytes() int64 { return 10 * media.MB }
 
 func (m *fakeMedia) Upload(_ context.Context, in media.UploadInput) (media.File, error) {
 	b, _ := io.ReadAll(in.Body)
@@ -119,6 +123,26 @@ func TestListParsesFilter(t *testing.T) {
 		if rec := serve(h, httptest.NewRequest(http.MethodGet, "/api/objects?"+bad, nil), nil); rec.Code != http.StatusBadRequest {
 			t.Fatalf("%s: %d", bad, rec.Code)
 		}
+	}
+}
+
+func TestListAddsPreview(t *testing.T) {
+	cat, _, h := newServer()
+	cat.listResult = []catalog.Object{cat.objects["birzha"], {ID: 3, Slug: "bez-foto", IsPublished: true}}
+	rec := serve(h, httptest.NewRequest(http.MethodGet, "/api/objects", nil), nil)
+	var list []struct {
+		Slug        string `json:"slug"`
+		CoverURL    string `json:"coverUrl"`
+		HasPanorama bool   `json:"hasPanorama"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&list); err != nil || len(list) != 2 {
+		t.Fatalf("список: %d %v", rec.Code, err)
+	}
+	if list[0].CoverURL != "/api/media/9/file" || !list[0].HasPanorama {
+		t.Fatalf("объект с фото: %+v", list[0])
+	}
+	if list[1].CoverURL != "" || list[1].HasPanorama {
+		t.Fatalf("объект без фото: %+v", list[1])
 	}
 }
 

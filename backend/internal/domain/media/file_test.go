@@ -90,3 +90,24 @@ func TestPanoramaRule(t *testing.T) {
 		t.Fatalf("общий предел: %v", err)
 	}
 }
+
+func TestPreviewOf(t *testing.T) {
+	cases := []struct {
+		name  string
+		files []File
+		want  Preview
+	}{
+		{"нет файлов", nil, Preview{}},
+		{"фото важнее архива", []File{{ID: 2, Kind: KindArchivePhoto}, {ID: 5, Kind: KindPhoto}, {ID: 4, Kind: KindPhoto}}, Preview{CoverID: 4}},
+		{"только архив", []File{{ID: 7, Kind: KindArchivePhoto}, {ID: 3, Kind: KindArchivePhoto}}, Preview{CoverID: 3}},
+		{"панорама не обложка", []File{{ID: 1, Kind: KindPanorama}}, Preview{HasPanorama: true}},
+	}
+	for _, c := range cases {
+		if got := PreviewOf(c.files); got != c.want {
+			t.Errorf("%s: %+v, ожидалось %+v", c.name, got, c.want)
+		}
+	}
+	if (Preview{}).CoverURL() != "" || (Preview{CoverID: 4}).CoverURL() != "/api/media/4/file" {
+		t.Error("CoverURL")
+	}
+}

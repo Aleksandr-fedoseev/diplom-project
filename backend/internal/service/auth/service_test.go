@@ -1,9 +1,11 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
@@ -58,6 +60,55 @@ func (f *fakeUsers) SetRole(ctx context.Context, id int64, role auth.Role) (auth
 	return u, err
 }
 
+func (f *fakeUsers) UpdateName(ctx context.Context, id int64, name string) (auth.User, error) {
+	u, err := f.ByID(ctx, id)
+	u.Name = name
+	f.byID[id] = u
+	return u, err
+}
+
+func (f *fakeUsers) UpdatePassword(ctx context.Context, id int64, hash string) error {
+	u, err := f.ByID(ctx, id)
+	u.PasswordHash = hash
+	f.byID[id] = u
+	return err
+}
+
+func (f *fakeUsers) SetAvatar(ctx context.Context, id int64, key *string) (auth.User, error) {
+	u, err := f.ByID(ctx, id)
+	u.AvatarKey = key
+	f.byID[id] = u
+	return u, err
+}
+
+// fakeAvatars — хранилище файлов в памяти.
+type fakeAvatars struct{ files map[string][]byte }
+
+func newFakeAvatars() *fakeAvatars { return &fakeAvatars{files: map[string][]byte{}} }
+
+func (f *fakeAvatars) Put(_ context.Context, key string, body io.Reader, _ int64, _ string) error {
+	b, err := io.ReadAll(body)
+	f.files[key] = b
+	return err
+}
+
+func (f *fakeAvatars) Get(_ context.Context, key string) (io.ReadSeekCloser, error) {
+	b, ok := f.files[key]
+	if !ok {
+		return nil, errors.New("нет файла")
+	}
+	return nopCloser{bytes.NewReader(b)}, nil
+}
+
+func (f *fakeAvatars) Remove(_ context.Context, key string) error {
+	delete(f.files, key)
+	return nil
+}
+
+type nopCloser struct{ io.ReadSeeker }
+
+func (nopCloser) Close() error { return nil }
+
 func (f *fakeUsers) SetBlocked(ctx context.Context, id int64, blocked bool) (auth.User, error) {
 	u, err := f.ByID(ctx, id)
 	u.IsBlocked = blocked
@@ -93,7 +144,7 @@ func (fakeTokens) Parse(t string) (int64, string, error) {
 
 func newTestService() (*Service, *fakeUsers) {
 	users := newFakeUsers()
-	return NewService(users, fakeHasher{}, fakeTokens{}), users
+	return NewService(users, fakeHasher{}, fakeTokens{}, newFakeAvatars()), users
 }
 
 func TestRegisterAndLogin(t *testing.T) {
@@ -218,5 +269,89 @@ func TestAuthenticateUsesCurrentRoleAndBlock(t *testing.T) {
 
 	if _, err := svc.Authenticate(ctx, "999:user"); !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("токен несуществующего пользователя: %v", err)
+	}
+}
+
+func TestUpdateName(t *testing.T) {
+	svc, _ := newTestService()
+	ctx := context.Background()
+	u, _ := svc.Register(ctx, auth.Registration{Email: "a@t.ru", Password: "password1", Name: "Иван"})
+
+	got, err := svc.UpdateName(ctx, u.ID, "  Иван Петров  ")
+	if err != nil || got.Name != "Иван Петров" {
+		t.Fatalf("имя: %+v, %v", got, err)
+	}
+	for _, bad := range []string{"   ", strings.Repeat("я", auth.MaxNameLen+1)} {
+		if _, err := svc.UpdateName(ctx, u.ID, bad); !errs.Is(err, errs.Invalid) {
+			t.Fatalf("имя %q: %v", bad, err)
+		}
+	}
+}
+
+func TestChangePassword(t *testing.T) {
+	svc, _ := newTestService()
+	ctx := context.Background()
+	u, _ := svc.Register(ctx, auth.Registration{Email: "a@t.ru", Password: "password1", Name: "Иван"})
+
+	if err := svc.ChangePassword(ctx, u.ID, "не тот", "password2"); !errors.Is(err, auth.ErrWrongPassword) {
+		t.Fatalf("неверный текущий пароль: %v", err)
+	}
+	if err := svc.ChangePassword(ctx, u.ID, "password1", "short"); !errs.Is(err, errs.Invalid) {
+		t.Fatalf("короткий новый пароль: %v", err)
+	}
+	if err := svc.ChangePassword(ctx, u.ID, "password1", "password1"); !errors.Is(err, auth.ErrSamePassword) {
+		t.Fatalf("тот же пароль: %v", err)
+	}
+	if err := svc.ChangePassword(ctx, u.ID, "password1", "password2"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := svc.Login(ctx, "a@t.ru", "password1"); !errors.Is(err, auth.ErrInvalidCredentials) {
+		t.Fatalf("старый пароль подошёл: %v", err)
+	}
+	if _, _, err := svc.Login(ctx, "a@t.ru", "password2"); err != nil {
+		t.Fatalf("новый пароль: %v", err)
+	}
+}
+
+// Минимальный PNG: сигнатура файла — по ней определяется тип.
+var pngBytes = append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 64)...)
+
+func TestAvatar(t *testing.T) {
+	users := newFakeUsers()
+	store := newFakeAvatars()
+	svc := NewService(users, fakeHasher{}, fakeTokens{}, store)
+	ctx := context.Background()
+	u, _ := svc.Register(ctx, auth.Registration{Email: "a@t.ru", Password: "password1", Name: "Иван"})
+
+	if _, _, err := svc.OpenAvatar(ctx, u.ID); !errors.Is(err, auth.ErrNoAvatar) {
+		t.Fatalf("аватара ещё нет: %v", err)
+	}
+	if _, err := svc.SetAvatar(ctx, u.ID, strings.NewReader("<html>не картинка</html>"), 24); !errors.Is(err, auth.ErrAvatarType) {
+		t.Fatalf("не картинка: %v", err)
+	}
+	if _, err := svc.SetAvatar(ctx, u.ID, bytes.NewReader(pngBytes), auth.MaxAvatarBytes+1); !errors.Is(err, auth.ErrAvatarTooBig) {
+		t.Fatalf("большой файл: %v", err)
+	}
+
+	first, err := svc.SetAvatar(ctx, u.ID, bytes.NewReader(pngBytes), int64(len(pngBytes)))
+	if err != nil || first.AvatarKey == nil || !strings.HasSuffix(*first.AvatarKey, ".png") || first.AvatarURL() == "" {
+		t.Fatalf("загрузка: %+v, %v", first, err)
+	}
+	body, ct, err := svc.OpenAvatar(ctx, u.ID)
+	if err != nil || ct != "image/png" {
+		t.Fatalf("открыть: %q, %v", ct, err)
+	}
+	if got, _ := io.ReadAll(body); !bytes.Equal(got, pngBytes) {
+		t.Fatal("файл сохранился не целиком")
+	}
+
+	// Новый аватар заменяет старый: старый файл удаляется, адрес меняется.
+	second, _ := svc.SetAvatar(ctx, u.ID, bytes.NewReader(pngBytes), int64(len(pngBytes)))
+	if _, ok := store.files[*first.AvatarKey]; ok || second.AvatarURL() == first.AvatarURL() || len(store.files) != 1 {
+		t.Fatalf("замена: файлы %v", store.files)
+	}
+
+	if u, err := svc.RemoveAvatar(ctx, u.ID); err != nil || u.AvatarKey != nil || len(store.files) != 0 {
+		t.Fatalf("удаление: %+v, %v, %v", u, err, store.files)
 	}
 }

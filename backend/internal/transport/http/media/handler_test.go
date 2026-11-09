@@ -29,8 +29,11 @@ func (s *fakeService) Upload(context.Context, media.UploadInput) (media.File, er
 }
 func (s *fakeService) ListByObject(context.Context, int64) ([]media.File, error)     { return nil, nil }
 func (s *fakeService) ListBySubmission(context.Context, int64) ([]media.File, error) { return nil, nil }
-func (s *fakeService) AttachToObject(context.Context, int64, int64) error            { return nil }
-func (s *fakeService) MaxUploadBytes() int64                                         { return 10 * media.MB }
+func (s *fakeService) Previews(context.Context, []int64) (map[int64]media.Preview, error) {
+	return nil, nil
+}
+func (s *fakeService) AttachToObject(context.Context, int64, int64) error { return nil }
+func (s *fakeService) MaxUploadBytes() int64                              { return 10 * media.MB }
 
 func (s *fakeService) Open(_ context.Context, id int64, v media.Viewer) (media.File, io.ReadSeekCloser, error) {
 	f, ok := s.files[id]

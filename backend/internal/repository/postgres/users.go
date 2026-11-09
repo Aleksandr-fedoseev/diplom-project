@@ -53,6 +53,7 @@ func toUser(u sqlc.User) auth.User {
 		IsBlocked:    u.IsBlocked,
 		CreatedAt:    u.CreatedAt,
 		PasswordHash: u.PasswordHash,
+		AvatarKey:    u.AvatarKey,
 	}
 }
 
@@ -103,4 +104,23 @@ func (r *Users) SetRole(ctx context.Context, id int64, role auth.Role) (auth.Use
 
 func (r *Users) SetBlocked(ctx context.Context, id int64, blocked bool) (auth.User, error) {
 	return oneUser(queries(ctx, r.pool).SetUserBlocked(ctx, sqlc.SetUserBlockedParams{ID: id, IsBlocked: blocked}))
+}
+
+func (r *Users) UpdateName(ctx context.Context, id int64, name string) (auth.User, error) {
+	return oneUser(queries(ctx, r.pool).UpdateUserName(ctx, sqlc.UpdateUserNameParams{ID: id, Name: name}))
+}
+
+func (r *Users) UpdatePassword(ctx context.Context, id int64, hash string) error {
+	n, err := queries(ctx, r.pool).UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{ID: id, PasswordHash: hash})
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return auth.ErrUserNotFound
+	}
+	return nil
+}
+
+func (r *Users) SetAvatar(ctx context.Context, id int64, key *string) (auth.User, error) {
+	return oneUser(queries(ctx, r.pool).SetUserAvatar(ctx, sqlc.SetUserAvatarParams{ID: id, AvatarKey: key}))
 }

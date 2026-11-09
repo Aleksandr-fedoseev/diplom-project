@@ -78,4 +78,5 @@ type User struct {
 	Role         string
 	IsBlocked    bool
 	CreatedAt    time.Time
+	AvatarKey    *string
 }

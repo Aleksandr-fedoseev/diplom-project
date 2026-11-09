@@ -19,3 +19,12 @@ UPDATE auth.users SET role = $2 WHERE id = $1 RETURNING *;
 
 -- name: SetUserBlocked :one
 UPDATE auth.users SET is_blocked = $2 WHERE id = $1 RETURNING *;
+
+-- name: UpdateUserName :one
+UPDATE auth.users SET name = $2 WHERE id = $1 RETURNING *;
+
+-- name: UpdateUserPassword :execrows
+UPDATE auth.users SET password_hash = $2 WHERE id = $1;
+
+-- name: SetUserAvatar :one
+UPDATE auth.users SET avatar_key = sqlc.narg(avatar_key) WHERE id = sqlc.arg(id) RETURNING *;

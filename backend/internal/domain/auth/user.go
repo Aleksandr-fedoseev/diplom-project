@@ -3,7 +3,9 @@
 package auth
 
 import (
+	"fmt"
 	"net/mail"
+	"path"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -36,7 +38,17 @@ type User struct {
 	Role         Role
 	IsBlocked    bool
 	CreatedAt    time.Time
-	PasswordHash string // наружу не отдаётся: transport выводит только нужные поля
+	PasswordHash string  // наружу не отдаётся: transport выводит только нужные поля
+	AvatarKey    *string // ключ файла аватара в хранилище; nil — аватара нет
+}
+
+// AvatarURL — адрес аватара в API; пусто, если аватара нет. Параметр v меняется вместе
+// с файлом, поэтому браузер не покажет старый аватар из кэша.
+func (u User) AvatarURL() string {
+	if u.AvatarKey == nil {
+		return ""
+	}
+	return fmt.Sprintf("/api/users/%d/avatar?v=%s", u.ID, path.Base(*u.AvatarKey))
 }
 
 // Principal — кто делает запрос: достаётся из токена, без обращения к БД.
@@ -64,18 +76,64 @@ type Registration struct {
 // Normalize приводит поля к одному виду и проверяет правила регистрации.
 func (r *Registration) Normalize() error {
 	r.Email = NormalizeEmail(r.Email)
-	r.Name = strings.TrimSpace(r.Name)
-	switch {
-	case !validEmail(r.Email):
+	if !validEmail(r.Email) {
 		return errs.New(errs.Invalid, "некорректный email")
-	case utf8.RuneCountInString(r.Password) < MinPasswordLen:
+	}
+	if err := CheckPassword(r.Password); err != nil {
+		return err
+	}
+	name, err := NormalizeName(r.Name)
+	r.Name = name
+	return err
+}
+
+const MaxNameLen = 100 // символов
+
+// NormalizeName — имя без пробелов по краям, не пустое и не длиннее MaxNameLen.
+func NormalizeName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	switch {
+	case name == "":
+		return "", errs.New(errs.Invalid, "укажите имя")
+	case utf8.RuneCountInString(name) > MaxNameLen:
+		return "", errs.New(errs.Invalid, "имя не длиннее 100 символов")
+	}
+	return name, nil
+}
+
+// CheckPassword — правило пароля при регистрации и смене.
+func CheckPassword(p string) error {
+	switch {
+	case utf8.RuneCountInString(p) < MinPasswordLen:
 		return errs.New(errs.Invalid, "пароль должен быть не короче 8 символов")
-	case len(r.Password) > MaxPasswordBytes:
+	case len(p) > MaxPasswordBytes:
 		return errs.New(errs.Invalid, "пароль слишком длинный: не больше 72 латинских или 36 русских букв")
-	case r.Name == "":
-		return errs.New(errs.Invalid, "укажите имя")
 	}
 	return nil
+}
+
+// Аватар: небольшая картинка; формат определяется по содержимому файла, а не по имени.
+const MaxAvatarBytes = 2 << 20 // 2 МБ
+
+var avatarTypes = map[string]string{"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+
+// AvatarExt — расширение файла для типа содержимого; ошибка, если тип не картинка.
+func AvatarExt(contentType string) (string, error) {
+	ext, ok := avatarTypes[contentType]
+	if !ok {
+		return "", ErrAvatarType
+	}
+	return ext, nil
+}
+
+// AvatarContentType — тип содержимого по ключу файла (для отдачи аватара).
+func AvatarContentType(key string) string {
+	for t, ext := range avatarTypes {
+		if strings.HasSuffix(key, ext) {
+			return t
+		}
+	}
+	return "application/octet-stream"
 }
 
 func validEmail(s string) bool {

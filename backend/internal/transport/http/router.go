@@ -61,6 +61,7 @@ func New(d Deps) http.Handler {
 
 		r.Route("/auth", d.Auth.Routes)
 		r.Route("/admin/users", d.Auth.AdminRoutes)
+		r.Route("/users", d.Auth.UserRoutes)
 
 		r.Route("/media", d.Media.Routes)
 		d.Catalog.Routes(r)

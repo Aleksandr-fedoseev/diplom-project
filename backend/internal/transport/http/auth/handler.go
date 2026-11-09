@@ -45,14 +45,29 @@ func NewHandler(svc auth.Service) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.With(middleware.LimitByIP(h.registerByIP)).Method(http.MethodPost, "/register", httpx.Handler(h.register))
 	r.With(middleware.LimitByIP(h.loginByIP)).Method(http.MethodPost, "/login", httpx.Handler(h.login))
-	r.With(middleware.RequireRole(auth.RoleUser)).Method(http.MethodGet, "/me", httpx.Handler(h.me))
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.RequireRole(auth.RoleUser))
+		r.Method(http.MethodGet, "/me", httpx.Handler(h.me))
+		r.Method(http.MethodPut, "/me", httpx.Handler(h.updateMe))
+		r.Method(http.MethodPut, "/me/password", httpx.Handler(h.changePassword))
+		r.Method(http.MethodPut, "/me/avatar", httpx.Handler(h.setAvatar))
+		r.Method(http.MethodDelete, "/me/avatar", httpx.Handler(h.removeAvatar))
+	})
+}
+
+// UserRoutes подключается по адресу /api/users: открытые сведения о пользователях.
+func (h *Handler) UserRoutes(r chi.Router) {
+	r.Method(http.MethodGet, "/{id}/avatar", httpx.Handler(h.avatar))
 }
 
 // AdminRoutes подключается по адресу /api/admin/users.
 func (h *Handler) AdminRoutes(r chi.Router) {
-	r.With(middleware.RequireRole(auth.RoleAdmin)).Method(http.MethodGet, "/", httpx.Handler(h.list))
-	r.With(middleware.RequireRole(auth.RoleAdmin)).Method(http.MethodPut, "/{id}/role", httpx.Handler(h.setRole))
-	r.With(middleware.RequireRole(auth.RoleModerator)).Method(http.MethodPut, "/{id}/blocked", httpx.Handler(h.setBlocked))
+	// Управление пользователями — прецедент администратора. Модератор блокирует автора
+	// только вместе с отказом по заявке (POST /moderation/submissions/{id}/reject).
+	r.Use(middleware.RequireRole(auth.RoleAdmin))
+	r.Method(http.MethodGet, "/", httpx.Handler(h.list))
+	r.Method(http.MethodPut, "/{id}/role", httpx.Handler(h.setRole))
+	r.Method(http.MethodPut, "/{id}/blocked", httpx.Handler(h.setBlocked))
 }
 
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) error {
@@ -150,5 +165,86 @@ func (h *Handler) setBlocked(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	httpx.JSON(w, http.StatusOK, toUserResponse(u))
+	return nil
+}
+
+// updateMe: PUT /api/auth/me {"name": "..."} — своё имя.
+func (h *Handler) updateMe(w http.ResponseWriter, r *http.Request) error {
+	var in profileRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return err
+	}
+	p, _ := middleware.PrincipalFrom(r.Context())
+	u, err := h.svc.UpdateName(r.Context(), p.UserID, in.Name)
+	if err != nil {
+		return err
+	}
+	httpx.JSON(w, http.StatusOK, toUserResponse(u))
+	return nil
+}
+
+// changePassword: PUT /api/auth/me/password {"currentPassword", "newPassword"}.
+// Подбор текущего пароля ограничен так же, как вход.
+func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) error {
+	var in passwordRequest
+	if err := httpx.DecodeJSON(r, &in); err != nil {
+		return err
+	}
+	p, _ := middleware.PrincipalFrom(r.Context())
+	if ok, retry := h.loginByEmail.Allow("password:" + strconv.FormatInt(p.UserID, 10)); !ok {
+		return httpx.TooManyRequests(w, "слишком много попыток, повторите позже", retry)
+	}
+	if err := h.svc.ChangePassword(r.Context(), p.UserID, in.CurrentPassword, in.NewPassword); err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+// setAvatar: PUT /api/auth/me/avatar, форма multipart с полем file.
+func (h *Handler) setAvatar(w http.ResponseWriter, r *http.Request) error {
+	r.Body = http.MaxBytesReader(w, r.Body, auth.MaxAvatarBytes+64<<10) // +64 КБ на служебные поля формы
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		return httpx.BadRequest("нужна картинка в поле file, не больше 2 МБ")
+	}
+	defer file.Close()
+	if r.MultipartForm != nil {
+		defer func() { _ = r.MultipartForm.RemoveAll() }()
+	}
+	p, _ := middleware.PrincipalFrom(r.Context())
+	u, err := h.svc.SetAvatar(r.Context(), p.UserID, file, header.Size)
+	if err != nil {
+		return err
+	}
+	httpx.JSON(w, http.StatusOK, toUserResponse(u))
+	return nil
+}
+
+func (h *Handler) removeAvatar(w http.ResponseWriter, r *http.Request) error {
+	p, _ := middleware.PrincipalFrom(r.Context())
+	u, err := h.svc.RemoveAvatar(r.Context(), p.UserID)
+	if err != nil {
+		return err
+	}
+	httpx.JSON(w, http.StatusOK, toUserResponse(u))
+	return nil
+}
+
+// avatar: GET /api/users/{id}/avatar — картинка аватара. Адрес меняется вместе с файлом
+// (параметр v), поэтому браузеру можно долго хранить её в кэше.
+func (h *Handler) avatar(w http.ResponseWriter, r *http.Request) error {
+	id, err := httpx.IDParam(r, "id")
+	if err != nil {
+		return err
+	}
+	body, contentType, err := h.svc.OpenAvatar(r.Context(), id)
+	if err != nil {
+		return err
+	}
+	defer body.Close()
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "public, max-age=604800")
+	http.ServeContent(w, r, "", time.Time{}, body)
 	return nil
 }

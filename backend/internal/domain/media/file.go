@@ -83,7 +83,48 @@ func (f File) CanView(v Viewer) bool {
 }
 
 // URL — адрес скачивания файла в API.
-func (f File) URL() string { return fmt.Sprintf("/api/media/%d/file", f.ID) }
+func (f File) URL() string { return fileURL(f.ID) }
+
+func fileURL(id int64) string { return fmt.Sprintf("/api/media/%d/file", id) }
+
+// Preview — сводка медиафайлов объекта для списка: обложка и наличие панорамы.
+type Preview struct {
+	CoverID     int64 // 0 — фотографий нет
+	HasPanorama bool
+}
+
+// CoverURL — адрес обложки; пусто, если фотографий нет.
+func (p Preview) CoverURL() string {
+	if p.CoverID == 0 {
+		return ""
+	}
+	return fileURL(p.CoverID)
+}
+
+// PreviewOf — то же правило, что в запросе ListObjectPreviews: обложка — первое современное
+// фото, иначе первый архивный снимок.
+func PreviewOf(files []File) Preview {
+	var p Preview
+	var archive int64
+	for _, f := range files {
+		switch f.Kind {
+		case KindPhoto:
+			if p.CoverID == 0 || f.ID < p.CoverID {
+				p.CoverID = f.ID
+			}
+		case KindArchivePhoto:
+			if archive == 0 || f.ID < archive {
+				archive = f.ID
+			}
+		case KindPanorama:
+			p.HasPanorama = true
+		}
+	}
+	if p.CoverID == 0 {
+		p.CoverID = archive
+	}
+	return p
+}
 
 // Rule — какие файлы принимаются для вида медиа.
 type Rule struct {

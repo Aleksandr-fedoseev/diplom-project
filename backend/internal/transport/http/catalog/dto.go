@@ -46,6 +46,8 @@ type objectResponse struct {
 	Tags               []string    `json:"tags"`
 	IsPublished        bool        `json:"isPublished"`
 	DistanceM          *float64    `json:"distanceM,omitempty"` // только при поиске рядом с точкой
+	CoverURL           string      `json:"coverUrl"`            // обложка; пусто — фотографий нет
+	HasPanorama        bool        `json:"hasPanorama"`
 	UpdatedAt          time.Time   `json:"updatedAt"`
 }
 

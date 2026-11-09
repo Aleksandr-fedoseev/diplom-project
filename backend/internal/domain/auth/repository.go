@@ -12,4 +12,8 @@ type UserRepository interface {
 	List(ctx context.Context, limit, offset int) ([]User, error)
 	SetRole(ctx context.Context, id int64, role Role) (User, error)
 	SetBlocked(ctx context.Context, id int64, blocked bool) (User, error)
+	UpdateName(ctx context.Context, id int64, name string) (User, error)
+	UpdatePassword(ctx context.Context, id int64, hash string) error
+	// SetAvatar меняет ключ файла аватара; nil — убрать аватар.
+	SetAvatar(ctx context.Context, id int64, key *string) (User, error)
 }
